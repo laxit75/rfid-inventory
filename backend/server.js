@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const { startScheduler, stopScheduler } = require('./services/scheduler');
+const { startChangeStream, stopChangeStream } = require('./services/changeStream');
 const Zone = require('./models/Zone');
 const logger = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
@@ -24,6 +25,8 @@ async function ensureDefaultZones() {
 }
 
 const app = express();
+const http = require('http');
+const { setIo } = require('./services/realtime');
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',').map((item) => item.trim()).filter(Boolean);
 app.use(cors({
   origin: allowedOrigins,
@@ -31,9 +34,12 @@ app.use(cors({
 }));
 app.use(express.json());
 
+const loginRateLimitWindowMs = process.env.LOGIN_LIMIT_WINDOW_MS ? Number(process.env.LOGIN_LIMIT_WINDOW_MS) : 15 * 60 * 1000;
+const loginRateLimitMax = process.env.LOGIN_LIMIT_MAX ? Number(process.env.LOGIN_LIMIT_MAX) : 10;
+
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
+  windowMs: loginRateLimitWindowMs,
+  max: loginRateLimitMax,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many login attempts. Please try again later.' }
@@ -44,8 +50,10 @@ app.use('/api/health', require('./routes/health'));
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tags', require('./routes/tags'));
+app.use('/api/equipment', require('./routes/equipment'));
 app.use('/api', require('./routes/movement'));
 app.use('/api/settings', require('./routes/settings'));
+app.use('/api/reports', require('./routes/reports'));
 app.use('/api/recipients', require('./routes/recipients'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/audit', require('./routes/audit'));
@@ -64,11 +72,39 @@ function connectWithRetry() {
     serverSelectionTimeoutMS: 5000
   })
     .then(async () => {
-      logger.info('Connected to MongoDB');
-      await ensureDefaultZones();
-      startScheduler();
+        logger.info('Connected to MongoDB');
+        await ensureDefaultZones();
+        // start leader election to control scheduler and change-stream
+        const leader = require('./services/leader');
+        leader.start({
+          onAcquire: async () => {
+            try { await startChangeStream(); } catch (e) {}
+            try { startScheduler(); } catch (e) {}
+          },
+          onRelease: async () => {
+            try { stopChangeStream(); } catch (e) {}
+            try { stopScheduler(); } catch (e) {}
+          }
+        });
       const PORT = process.env.PORT || 5000;
       server = app.listen(PORT, () => logger.info('Backend running', { port: PORT }));
+      // attach socket.io for realtime updates
+      try {
+        const { Server } = require('socket.io');
+        const io = new Server(server, {
+          cors: {
+            origin: allowedOrigins,
+            credentials: true
+          }
+        });
+        setIo(io);
+        io.on('connection', (socket) => {
+          logger.info('Client connected to realtime', { id: socket.id });
+          socket.on('disconnect', () => logger.info('Client disconnected', { id: socket.id }));
+        });
+      } catch (err) {
+        logger.warn('Socket.io not available', { error: err.message });
+      }
       server.on('error', (err) => {
         if (err.code === 'EADDRINUSE') {
           logger.error('Port already in use', { port: PORT });
@@ -91,8 +127,13 @@ mongoose.connection.on('disconnected', () => {
 
 connectWithRetry();
 
-function shutdown(signal) {
+async function shutdown(signal) {
   logger.info('Shutting down gracefully', { signal });
+  try {
+    const leader = require('./services/leader');
+    await leader.stop();
+  } catch (e) {}
+
   if (server) {
     server.close(() => {
       logger.info('HTTP server closed');
@@ -100,9 +141,6 @@ function shutdown(signal) {
     });
   } else {
     process.exit(0);
-  }
-  if (typeof stopScheduler === 'function') {
-    stopScheduler();
   }
 }
 

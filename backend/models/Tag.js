@@ -25,8 +25,10 @@ const tagSchema = new mongoose.Schema({
   disableReason: { type: String, default: '' },
   lastAlarmBeepAt: { type: Date, default: null },
   lastEmailSentAt: { type: Date, default: null },
+  lastSmsSentAt: { type: Date, default: null },
   overdueAlertStart: { type: Date, default: null },
-  lastOverdueEmailSentAt: { type: Date, default: null }
+  lastOverdueEmailSentAt: { type: Date, default: null },
+  lastOverdueSmsSentAt: { type: Date, default: null }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Tag', tagSchema);

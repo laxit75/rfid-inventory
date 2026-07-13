@@ -1,4 +1,6 @@
 const nodemailer = require('nodemailer');
+const fs = require('fs');
+const path = require('path');
 const Recipient = require('../models/Recipient');
 const AlertLog = require('../models/AlertLog');
 const logger = require('../utils/logger');
@@ -10,10 +12,9 @@ function buildTransporter() {
   const smtpPort = Number(process.env.SMTP_PORT || 587);
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = process.env.SMTP_PASS;
-  const smtpFrom = process.env.SMTP_FROM || 'RFID System <no-reply@rfid.local>';
 
   if (!smtpHost || !smtpUser || !smtpPass) {
-    logger.warn('SMTP credentials missing; falling back to Ethereal for local development', { smtpHost: Boolean(smtpHost), smtpUser: Boolean(smtpUser) });
+    logger.warn('SMTP credentials missing; falling back to Ethereal for local development');
     return null;
   }
 
@@ -24,9 +25,18 @@ function buildTransporter() {
     auth: {
       user: smtpUser,
       pass: smtpPass
-    },
-    from: smtpFrom
+    }
   });
+}
+
+function renderTemplate(templatePath, vars) {
+  try {
+    const t = fs.readFileSync(path.join(__dirname, '..', 'emailTemplates', templatePath), 'utf8');
+    return Object.keys(vars).reduce((out, k) => out.split(`{{${k}}}`).join(vars[k] || ''), t);
+  } catch (err) {
+    logger.error('Template render failed', { templatePath, error: err.message });
+    return '';
+  }
 }
 
 (async () => {
@@ -50,12 +60,6 @@ function buildTransporter() {
   }
 })();
 
-/**
- * Sends an alert email to all configured recipients.
- * @param {Object} tag - Mongoose Tag document
- * @param {('ALARM'|'OVERDUE')} type
- * @returns {Object} - the nodemailer info object
- */
 async function sendAlertEmail(tag, type) {
   try {
     const recipients = await Recipient.find({});
@@ -69,8 +73,17 @@ async function sendAlertEmail(tag, type) {
       ? `ALARM: Equipment "${tag.equipment?.name || tag.tagId}" left lab`
       : `OVERDUE: Equipment "${tag.equipment?.name || tag.tagId}" is overdue`;
 
-    const html = `<p>Tag <strong>${tag.tagId}</strong> ${type === 'ALARM' ? 'has exited the lab unintentionally' : 'is overdue and still outside'}.</p>
-                <p>Equipment: ${tag.equipment?.name || 'N/A'}</p>`;
+    const vars = {
+      tagId: tag.tagId,
+      equipmentName: tag.equipment?.name || 'N/A',
+      zoneName: (tag.currentZone && tag.currentZone.name) || (tag.assignedZone && tag.assignedZone.name) || 'N/A',
+      timestamp: new Date().toISOString(),
+      details: tag.notes || '' ,
+      overdueSince: tag.overdueSince ? tag.overdueSince.toISOString() : ''
+    };
+
+    const templateFile = type === 'ALARM' ? 'alert.html' : 'overdue.html';
+    const html = renderTemplate(templateFile, vars);
 
     if (!transporter) {
       logger.warn('Email transport unavailable; skipping send', { tagId: tag.tagId, type });
@@ -102,4 +115,67 @@ async function sendAlertEmail(tag, type) {
   }
 }
 
-module.exports = { sendAlertEmail };
+async function sendAlertSms(tag, type) {
+  try {
+    const recipients = await Recipient.find({ phone: { $exists: true, $ne: '' } });
+    if (recipients.length === 0) {
+      logger.warn('No SMS recipients configured; skipping SMS', { tagId: tag.tagId, type });
+      return null;
+    }
+
+    const recipientsWithPhone = recipients.map(r => r.phone).filter(Boolean);
+    if (recipientsWithPhone.length === 0) {
+      logger.warn('No SMS phone numbers found; skipping SMS', { tagId: tag.tagId, type });
+      return null;
+    }
+
+    const message = type === 'ALARM'
+      ? `ALARM: equipment ${tag.equipment?.name || tag.tagId} left assigned zone (tag ${tag.tagId}).`
+      : `OVERDUE: equipment ${tag.equipment?.name || tag.tagId} is overdue (tag ${tag.tagId}).`;
+
+    const result = await sendSms(recipientsWithPhone, message);
+    if (result) {
+      const logType = type === 'ALARM' ? 'SMS_SENT' : 'OVERDUE_SMS_SENT';
+      await AlertLog.create({
+        type: logType,
+        tag: tag._id,
+        tagId: tag.tagId,
+        timestamp: new Date(),
+        details: `Recipients: ${recipientsWithPhone.join(', ')}`
+      });
+    }
+
+    return result;
+  } catch (err) {
+    logger.error('SMS notification failed', { tagId: tag.tagId, type, error: err.message });
+    return null;
+  }
+}
+
+async function sendSms(recipients, message) {
+  // Minimal pluggable SMS support. If TWILIO_* env vars exist, attempt to send via Twilio.
+  try {
+    const twSid = process.env.TWILIO_ACCOUNT_SID;
+    const twToken = process.env.TWILIO_AUTH_TOKEN;
+    const twFrom = process.env.TWILIO_FROM;
+    if (!twSid || !twToken || !twFrom) {
+      logger.warn('SMS provider not configured; skipping SMS send', { configured: false });
+      return null;
+    }
+    // require lazily to avoid adding hard dependency unless configured
+    const Twilio = require('twilio');
+    const client = new Twilio(twSid, twToken);
+    const results = [];
+    for (const to of recipients) {
+      const res = await client.messages.create({ body: message, from: twFrom, to });
+      results.push(res.sid);
+    }
+    logger.info('SMS sent', { recipients: recipients.length });
+    return results;
+  } catch (err) {
+    logger.error('SMS send failed', { error: err.message });
+    return null;
+  }
+}
+
+module.exports = { sendAlertEmail, sendSms };

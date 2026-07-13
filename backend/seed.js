@@ -7,6 +7,7 @@ const User = require('./models/User');
 const Settings = require('./models/Settings');
 const Recipient = require('./models/Recipient');
 const Zone = require('./models/Zone');
+const Reader = require('./models/Reader');
 
 const forceFlag = process.argv.includes('--force');
 if (process.env.NODE_ENV === 'production' && !forceFlag) {
@@ -31,6 +32,12 @@ async function seed() {
   // Create zones
   const zoneA = await Zone.create({ name: 'Zone A - Test Bay', description: 'Primary test bay' });
   const zoneB = await Zone.create({ name: 'Zone B - Paint Shop', description: 'Paint and finishing zone' });
+
+  // Create readers and associate with zones
+  await Reader.create([
+    { readerId: 'Shutter-1', name: 'Zone A - Test Bay', description: 'Primary test bay reader', zone: zoneA._id, status: 'ONLINE' },
+    { readerId: 'Shutter-2', name: 'Zone B - Paint Shop', description: 'Paint and finishing zone reader', zone: zoneB._id, status: 'ONLINE' }
+  ]);
 
   // Create sample equipment
   const equip1 = await Equipment.create({ name: 'Torque Wrench', category: 'Tool', quantity: 5 });
