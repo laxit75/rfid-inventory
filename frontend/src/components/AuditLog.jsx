@@ -6,6 +6,8 @@ export default function AuditLog() {
   const [movements, setMovements] = useState([])
   const [alerts, setAlerts] = useState([])
   const [filterTagId, setFilterTagId] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [loading, setLoading] = useState(true)
 
   const token = localStorage.getItem('token')
@@ -42,6 +44,30 @@ export default function AuditLog() {
     fetchData()
   }
 
+  const downloadAuditCsv = async () => {
+    try {
+      const params = {}
+      if (startDate) params.start = startDate
+      if (endDate) params.end = endDate
+      const res = await api.get('/api/reports/audit.csv', {
+        params,
+        responseType: 'blob'
+      })
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      const fileName = `rfid-audit-${startDate || 'start'}-${endDate || 'end'}.csv`
+      link.setAttribute('download', fileName)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('AuditLog download error:', err)
+    }
+  }
+
   const groupedMovements = movements.reduce((acc, item) => {
     const day = new Date(item.createdAt).toLocaleDateString()
     if (!acc[day]) acc[day] = []
@@ -76,7 +102,16 @@ export default function AuditLog() {
             <span>Filter by tag</span>
             <input placeholder="Tag ID" value={filterTagId} onChange={e => setFilterTagId(e.target.value)} />
           </label>
+          <label className="field-group compact">
+            <span>From</span>
+            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+          </label>
+          <label className="field-group compact">
+            <span>To</span>
+            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+          </label>
           <button className="button button-secondary" type="submit">Apply</button>
+          <button className="button button-primary" type="button" onClick={downloadAuditCsv}>Download CSV</button>
         </form>
 
         {loading ? (

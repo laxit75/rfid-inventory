@@ -1,9 +1,21 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import axios from 'axios'
+import { connectRealtime, disconnectRealtime } from '../realtime'
+import { Link } from 'react-router-dom'
+import PieChart from './PieChart'
+import TrendChart from './TrendChart'
 
 export default function Dashboard() {
   const [tags, setTags] = useState([])
   const [settings, setSettings] = useState(null)
+  const [summary, setSummary] = useState(null)
+  const [trendData, setTrendData] = useState([])
+  const [trendStart, setTrendStart] = useState(() => {
+    const d = new Date()
+    const start = new Date(d.getTime() - 29 * 24 * 60 * 60 * 1000)
+    return start.toISOString().slice(0, 10)
+  })
+  const [trendEnd, setTrendEnd] = useState(() => (new Date()).toISOString().slice(0, 10))
   const [loading, setLoading] = useState(true)
   const [soundEnabled, setSoundEnabled] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -31,11 +43,116 @@ export default function Dashboard() {
     setSettings(res.data)
   }
 
+  const fetchSummary = async () => {
+    try {
+      const res = await axios.get('/api/reports/summary', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+      setSummary(res.data)
+    } catch (err) {
+      setSummary(null)
+    }
+  }
+
+  const fetchTrend = async () => {
+    try {
+      const res = await axios.get('/api/reports/trends?days=30', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+      setTrendData(res.data.trend || [])
+    } catch (err) {
+      setTrendData([])
+    }
+  }
+
+  const fetchTrendRange = async (start, end) => {
+    try {
+      const qs = []
+      if (start) qs.push(`start=${start}`)
+      if (end) qs.push(`end=${end}`)
+      const qstr = qs.length > 0 ? `?${qs.join('&')}` : ''
+      const res = await axios.get(`/api/reports/trends${qstr}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+      setTrendData(res.data.trend || [])
+    } catch (err) {
+      setTrendData([])
+    }
+  }
+
   useEffect(() => {
+    let pollIntervalId = null
+    let pollFallbackTimer = null
+
+    const startPolling = (immediate = false) => {
+      if (pollIntervalId) return
+      if (immediate) fetchTags(false)
+      pollIntervalId = setInterval(() => fetchTags(false), 2000)
+    }
+
+    const stopPolling = () => {
+      if (pollIntervalId) {
+        clearInterval(pollIntervalId)
+        pollIntervalId = null
+      }
+      if (pollFallbackTimer) {
+        clearTimeout(pollFallbackTimer)
+        pollFallbackTimer = null
+      }
+    }
+
     fetchTags(true)
     fetchSettings()
-    const interval = setInterval(() => fetchTags(false), 2000)
-    return () => clearInterval(interval)
+    fetchSummary()
+    // load default range (last 30 days)
+    fetchTrendRange(trendStart, trendEnd)
+
+    // Realtime with polling fallback
+    const sock = connectRealtime()
+    const mergeTag = (incoming) => {
+      if (!incoming) return
+      const tag = incoming.tag || incoming
+      setTags(prev => {
+        const idx = prev.findIndex(t => t.tagId === tag.tagId)
+        if (idx === -1) return [tag, ...prev]
+        const copy = [...prev]
+        copy[idx] = { ...copy[idx], ...tag }
+        return copy
+      })
+    }
+
+    // If socket connects, stop polling; if it disconnects, start polling after short delay
+    sock.on('connect', () => {
+      stopPolling()
+    })
+    sock.on('disconnect', () => {
+      // start polling fallback after 1s to allow quick reconnects
+      if (pollFallbackTimer) clearTimeout(pollFallbackTimer)
+      pollFallbackTimer = setTimeout(() => startPolling(true), 1000)
+    })
+    sock.on('connect_error', (err) => {
+      console.warn('Realtime connect_error', err && err.message)
+      // If connection cannot be established, ensure polling runs
+      startPolling(true)
+    })
+
+    // Subscribe to events
+    sock.on('tag:movement', (payload) => mergeTag(payload.tag || payload))
+    sock.on('tag:alarm', (payload) => mergeTag(payload.tag || payload))
+
+    // If socket isn't connected shortly after mount, start polling
+    if (!sock.connected) {
+      // allow short time for socket to connect before starting polling
+      const t = setTimeout(() => {
+        if (!sock.connected) startPolling(true)
+      }, 800)
+      // store to clear on cleanup
+      pollFallbackTimer = t
+    }
+
+    return () => {
+      stopPolling()
+      try { sock.off('tag:movement') } catch (e) {}
+      try { sock.off('tag:alarm') } catch (e) {}
+      try { sock.off('connect') } catch (e) {}
+      try { sock.off('disconnect') } catch (e) {}
+      try { sock.off('connect_error') } catch (e) {}
+      disconnectRealtime()
+    }
   }, [])
 
   useEffect(() => {
@@ -102,11 +219,27 @@ export default function Dashboard() {
     }
   }
 
-  const activeAlarms = tags.filter(t => t.alertStatus === 'ALARMING').length
-  const overdue = tags.filter(t => t.alertStatus === 'OVERDUE').length
-  const outside = tags.filter(t => t.currentZone === null || t.currentZone === undefined).length
-  const disabled = tags.filter(t => t.status === 'TEMP_DISABLED' || t.status === 'PERMANENT_DISABLED').length
-  const healthy = tags.length - activeAlarms - overdue - disabled
+  const activeAlarms = summary?.alertCounts?.ALARMING ?? tags.filter(t => t.alertStatus === 'ALARMING').length
+  const overdue = summary?.alertCounts?.OVERDUE ?? tags.filter(t => t.alertStatus === 'OVERDUE').length
+  const outside = typeof summary?.outsideCount === 'number' ? summary.outsideCount : tags.filter(t => t.currentZone === null || t.currentZone === undefined).length
+  const disabled = (summary?.totals?.TEMP_DISABLED ?? tags.filter(t => t.status === 'TEMP_DISABLED').length) + (summary?.totals?.PERMANENT_DISABLED ?? tags.filter(t => t.status === 'PERMANENT_DISABLED').length)
+  const healthy = summary?.totals?.ACTIVE ?? tags.length - activeAlarms - overdue - disabled
+  const violationsToday = summary?.violationsToday ?? 0
+  const violationsWeek = summary?.violationsWeek ?? 0
+  const avgResolutionMs = summary?.avgResolutionMs ?? null
+
+  const formatDuration = (ms) => {
+    if (ms === null) return 'N/A'
+    const seconds = Math.round(ms / 1000)
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}m ${secs}s`
+  }
+
+  const trendBounds = useMemo(() => {
+    if (!trendData || trendData.length === 0) return { max: 1 }
+    return { max: Math.max(...trendData.map(item => item.total), 1) }
+  }, [trendData])
 
   return (
     <div className="page-shell">
@@ -139,6 +272,67 @@ export default function Dashboard() {
         <span className="summary-pill warning">⚠ {activeAlarms} alarming</span>
         <span className="summary-pill neutral">• {overdue} overdue</span>
         <span className="summary-pill muted">• {disabled} disabled</span>
+      </div>
+
+      <div className="stats-grid">
+        <div className="stat-card accent-info">
+          <div className="stat-title">Violations today</div>
+          <div className="stat-value">{violationsToday}</div>
+        </div>
+        <div className="stat-card accent-info">
+          <div className="stat-title">Violations this week</div>
+          <div className="stat-value">{violationsWeek}</div>
+        </div>
+        <div className="stat-card accent-secondary">
+          <div className="stat-title">Avg resolution</div>
+          <div className="stat-value">{avgResolutionMs !== null ? `${Math.round(avgResolutionMs / 1000)}s` : 'N/A'}</div>
+        </div>
+        <div className="stat-card accent-secondary">
+          <div className="stat-title">Outside lab</div>
+          <div className="stat-value">{outside}</div>
+        </div>
+      </div>
+
+      <div className="content-card">
+        <div className="card-header">
+          <div>
+            <h3>Violation trend</h3>
+            <p className="card-copy">Alarms raised per day. Select a date range to focus the chart.</p>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <label style={{ fontSize: 13, color: '#475569' }}>From
+              <input type="date" style={{ marginLeft: 8 }} value={trendStart || ''} onChange={e => setTrendStart(e.target.value)} />
+            </label>
+            <label style={{ fontSize: 13, color: '#475569' }}>To
+              <input type="date" style={{ marginLeft: 8 }} value={trendEnd || ''} onChange={e => setTrendEnd(e.target.value)} />
+            </label>
+            <button className="button button-secondary" onClick={() => fetchTrendRange(trendStart, trendEnd)}>Apply</button>
+            <button className="button button-ghost" onClick={() => { const d = new Date(); const s = new Date(d.getTime() - 29 * 24 * 60 * 60 * 1000); setTrendStart(s.toISOString().slice(0,10)); setTrendEnd(d.toISOString().slice(0,10)); fetchTrendRange(s.toISOString().slice(0,10), d.toISOString().slice(0,10)); }}>Last 30d</button>
+          </div>
+        </div>
+        <div className="trend-chart">
+          {trendData.length === 0 ? (
+            <div className="empty-state">No trend data available yet.</div>
+          ) : (
+            <TrendChart data={trendData} />
+          )}
+        </div>
+      </div>
+
+      <div className="content-card">
+        <div className="card-header">
+          <div>
+            <h3>Violation distribution</h3>
+            <p className="card-copy">Current proportion of tag alert statuses.</p>
+          </div>
+        </div>
+        <div style={{ padding: 16 }}>
+          <PieChart data={[
+            { label: 'Alarming', value: summary?.alertCounts?.ALARMING ?? 0, color: '#ef4444' },
+            { label: 'Overdue', value: summary?.alertCounts?.OVERDUE ?? 0, color: '#f97316' },
+            { label: 'Healthy', value: summary?.alertCounts?.NONE ?? 0, color: '#10b981' }
+          ]} />
+        </div>
       </div>
 
       {activeAlarms > 0 && (
@@ -203,7 +397,7 @@ export default function Dashboard() {
                 {tags.map(tag => (
                   <tr key={tag._id} className={tag.alertStatus !== 'NONE' ? 'alert-row' : ''}>
                     <td>
-                      <div className="table-main">{tag.tagId}</div>
+                      <div className="table-main"><Link to={`/tags/${tag._id}/history`}>{tag.tagId}</Link></div>
                       {tag.alertStatus === 'ALARMING' && <div className="table-meta">Needs attention</div>}
                     </td>
                     <td>{tag.equipment?.name || 'N/A'}</td>

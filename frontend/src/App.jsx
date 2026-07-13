@@ -4,6 +4,7 @@ import Login from './components/Login'
 import Dashboard from './components/Dashboard'
 import Simulator from './components/Simulator'
 import TagManagement from './components/TagManagement'
+import TagHistory from './components/TagHistory'
 import Settings from './components/Settings'
 import Recipients from './components/Recipients'
 import Users from './components/Users'
@@ -49,6 +50,7 @@ function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/simulator" element={<Simulator />} />
         <Route path="/tags" element={<TagManagement />} />
+        <Route path="/tags/:tagId/history" element={<TagHistory />} />
         <Route path="/settings" element={user?.role === 'ADMIN' ? <Settings /> : <Navigate to="/" />} />
         <Route path="/recipients" element={user?.role === 'ADMIN' ? <Recipients /> : <Navigate to="/" />} />
         <Route path="/users" element={user?.role === 'ADMIN' ? <Users /> : <Navigate to="/" />} />

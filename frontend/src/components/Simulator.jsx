@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import { connectRealtime, disconnectRealtime } from '../realtime'
 
 export default function Simulator() {
   const [tags, setTags] = useState([])
@@ -25,7 +26,26 @@ export default function Simulator() {
   useEffect(() => {
     fetchTags(true)
     const interval = setInterval(() => fetchTags(false), 2000)
-    return () => clearInterval(interval)
+    const sock = connectRealtime()
+    const mergeTag = (incoming) => {
+      if (!incoming) return
+      const tag = incoming.tag || incoming
+      setTags(prev => {
+        const idx = prev.findIndex(t => t.tagId === tag.tagId)
+        if (idx === -1) return [tag, ...prev]
+        const copy = [...prev]
+        copy[idx] = { ...copy[idx], ...tag }
+        return copy
+      })
+    }
+    sock.on('tag:movement', (payload) => mergeTag(payload.tag || payload))
+    sock.on('tag:alarm', (payload) => mergeTag(payload.tag || payload))
+    return () => {
+      clearInterval(interval)
+      try { sock.off('tag:movement') } catch (e) {}
+      try { sock.off('tag:alarm') } catch (e) {}
+      disconnectRealtime()
+    }
   }, [])
 
   useEffect(() => {

@@ -1,11 +1,19 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import axios from 'axios'
 
 export default function TagManagement() {
   const [tags, setTags] = useState([])
   const [zones, setZones] = useState([])
+  const [equipments, setEquipments] = useState([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState(null)
+  const [showAdd, setShowAdd] = useState(false)
+  const [newTagId, setNewTagId] = useState('')
+  const [newEquipment, setNewEquipment] = useState('')
+  const [newZone, setNewZone] = useState('')
+  const [newStatus, setNewStatus] = useState('ACTIVE')
+  const [newError, setNewError] = useState('')
 
   const fetchTags = async (isInitial = false) => {
     try {
@@ -26,9 +34,17 @@ export default function TagManagement() {
     setZones(res.data)
   }
 
+  const fetchEquipments = async () => {
+    const res = await axios.get('/api/equipment', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    })
+    setEquipments(res.data)
+  }
+
   useEffect(() => {
     fetchTags(true)
     fetchZones()
+    fetchEquipments()
   }, [])
 
   const handleSilence = async (id) => {
@@ -38,6 +54,35 @@ export default function TagManagement() {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       })
       fetchTags(false)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const createTag = async () => {
+    setNewError('')
+    if (!newTagId.trim() || !newEquipment) {
+      setNewError('Tag ID and equipment are required.')
+      return
+    }
+    setBusyId('new')
+    try {
+      await axios.post('/api/tags', {
+        tagId: newTagId.trim(),
+        equipment: newEquipment,
+        assignedZone: newZone || null,
+        status: newStatus
+      }, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      })
+      setNewTagId('')
+      setNewEquipment('')
+      setNewZone('')
+      setNewStatus('ACTIVE')
+      setShowAdd(false)
+      fetchTags(false)
+    } catch (err) {
+      setNewError(err.response?.data?.error || 'Unable to create tag.')
     } finally {
       setBusyId(null)
     }
@@ -66,6 +111,57 @@ export default function TagManagement() {
       </div>
 
       <div className="content-card">
+        <div className="card-header">
+          <div>
+            <h3>Tag management</h3>
+            <p className="card-copy">Adjust tag state and resolve active alarms without changing backend behavior.</p>
+          </div>
+          <button className="button button-primary" onClick={() => setShowAdd(prev => !prev)}>
+            {showAdd ? 'Cancel' : 'Add Tag'}
+          </button>
+        </div>
+        {showAdd && (
+          <div className="content-panel" style={{ marginBottom: 16, padding: 16, background: '#f8fafc', borderRadius: 12 }}>
+            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr', alignItems: 'end' }}>
+              <label className="field-group">
+                <span>Tag ID</span>
+                <input value={newTagId} onChange={(e) => setNewTagId(e.target.value)} placeholder="TAG-004" />
+              </label>
+              <label className="field-group">
+                <span>Equipment</span>
+                <select value={newEquipment} onChange={(e) => setNewEquipment(e.target.value)}>
+                  <option value="">Select equipment</option>
+                  {equipments.map(item => (
+                    <option key={item._id} value={item._id}>{item.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field-group">
+                <span>Assigned zone</span>
+                <select value={newZone} onChange={(e) => setNewZone(e.target.value)}>
+                  <option value="">Unassigned</option>
+                  {zones.map(zone => (
+                    <option key={zone._id} value={zone._id}>{zone.name}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field-group">
+                <span>Status</span>
+                <select value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="TEMP_DISABLED">TEMP_DISABLED</option>
+                  <option value="PERMANENT_DISABLED">PERMANENT_DISABLED</option>
+                </select>
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 12 }}>
+              <button className="button button-primary" onClick={createTag} disabled={busyId === 'new'}>
+                {busyId === 'new' ? 'Creating…' : 'Create Tag'}
+              </button>
+              {newError && <span style={{ color: '#b91c1c' }}>{newError}</span>}
+            </div>
+          </div>
+        )}
         {loading ? (
           <div className="loading-state">Loading tags…</div>
         ) : tags.length === 0 ? (
@@ -131,6 +227,7 @@ export default function TagManagement() {
                             {busyId === tag._id ? 'Working…' : 'Silence'}
                           </button>
                         )}
+                        <Link className="button button-secondary" to={`/tags/${tag._id}/history`}>History</Link>
                         {tag.status === 'TEMP_DISABLED' && (
                           <div className="inline-form-grid">
                             <label className="field-group compact">

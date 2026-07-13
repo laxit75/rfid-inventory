@@ -3,9 +3,9 @@ import axios from 'axios'
 
 export default function Recipients() {
   const [recipients, setRecipients] = useState([])
-  const [newRecipient, setNewRecipient] = useState({ email: '', name: '' })
+  const [newRecipient, setNewRecipient] = useState({ email: '', name: '', phone: '', role: 'SUPPORT' })
   const [editId, setEditId] = useState(null)
-  const [editForm, setEditForm] = useState({ email: '', name: '' })
+  const [editForm, setEditForm] = useState({ email: '', name: '', phone: '', role: 'SUPPORT' })
   const [loading, setLoading] = useState(true)
   const [formError, setFormError] = useState('')
   const [feedback, setFeedback] = useState('')
@@ -24,8 +24,8 @@ export default function Recipients() {
 
   const handleAdd = async (e) => {
     e.preventDefault()
-    if (!newRecipient.email || !newRecipient.name) {
-      setFormError('Both name and email are required.')
+    if (!newRecipient.email || !newRecipient.name || !newRecipient.role) {
+      setFormError('Name, email, and role are required.')
       return
     }
     setSaving(true)
@@ -33,7 +33,7 @@ export default function Recipients() {
     try {
       await axios.post('/api/recipients', newRecipient, { headers: { Authorization: `Bearer ${token}` } })
       setFeedback('Recipient added successfully.')
-      setNewRecipient({ email: '', name: '' })
+      setNewRecipient({ email: '', name: '', phone: '', role: 'SUPPORT' })
       fetchRecipients()
     } catch (err) {
       setFormError(err.response?.data?.error || 'Unable to add recipient.')
@@ -54,10 +54,14 @@ export default function Recipients() {
 
   const handleEditStart = (recipient) => {
     setEditId(recipient._id)
-    setEditForm({ email: recipient.email, name: recipient.name })
+    setEditForm({ email: recipient.email, name: recipient.name, phone: recipient.phone || '', role: recipient.role || 'SUPPORT' })
   }
 
   const handleEditSave = async () => {
+    if (!editForm.email || !editForm.name || !editForm.role) {
+      setFormError('Name, email, and role are required.')
+      return
+    }
     setSaving(true)
     try {
       await axios.put(`/api/recipients/${editId}`, editForm, { headers: { Authorization: `Bearer ${token}` } })
@@ -76,8 +80,8 @@ export default function Recipients() {
       <div className="page-head">
         <div>
           <p className="eyebrow">Admin</p>
-          <h2>Email recipients</h2>
-          <p className="page-subtitle">Manage who receives alert emails for the RFID system.</p>
+          <h2>Alert recipients</h2>
+          <p className="page-subtitle">Manage email and SMS recipients for RFID alert escalation.</p>
         </div>
       </div>
 
@@ -111,6 +115,8 @@ export default function Recipients() {
                 <tr>
                   <th>Name</th>
                   <th>Email</th>
+                  <th>Phone</th>
+                  <th>Role</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -121,6 +127,14 @@ export default function Recipients() {
                       <>
                         <td><input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} /></td>
                         <td><input value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} /></td>
+                        <td><input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} /></td>
+                        <td>
+                          <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })}>
+                            <option value="SUPPORT">Support</option>
+                            <option value="SECURITY">Security</option>
+                            <option value="ADMIN">Admin</option>
+                          </select>
+                        </td>
                         <td>
                           <div className="button-row">
                             <button className="button button-secondary" onClick={handleEditSave}>Save</button>
@@ -132,6 +146,8 @@ export default function Recipients() {
                       <>
                         <td>{r.name}</td>
                         <td>{r.email}</td>
+                        <td>{r.phone || '—'}</td>
+                        <td>{r.role}</td>
                         <td>
                           <div className="button-row">
                             <button className="button button-secondary" onClick={() => handleEditStart(r)}>Edit</button>
