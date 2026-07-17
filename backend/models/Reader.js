@@ -5,6 +5,8 @@ const readerSchema = new mongoose.Schema({
   name: { type: String, required: true },
   description: { type: String, default: '' },
   zone: { type: mongoose.Schema.Types.ObjectId, ref: 'Zone', default: null },
+  antennaPort: { type: Number, default: null },
+  direction: { type: String, enum: ['EXIT', 'ENTRY', null], default: null },
   status: { type: String, enum: ['ONLINE', 'OFFLINE', 'UNKNOWN'], default: 'UNKNOWN' },
   lastSeenAt: { type: Date, default: null }
 }, { timestamps: true });

@@ -10,7 +10,8 @@ router.use(auth);
 // List all tags (populated)
 router.get('/', async (req, res, next) => {
   try {
-    const tags = await Tag.find().populate(['equipment', 'assignedZone', 'currentZone']);
+    const filter = req.query.zone ? { $or: [{ assignedZone: req.query.zone }, { currentZone: req.query.zone }] } : {};
+    const tags = await Tag.find(filter).populate(['equipment', 'assignedZone', 'currentZone']);
     res.json(tags);
   } catch (err) {
     next(err);

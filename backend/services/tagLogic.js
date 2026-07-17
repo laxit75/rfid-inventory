@@ -3,7 +3,7 @@ const MovementEvent = require('../models/MovementEvent');
 const AlertLog = require('../models/AlertLog');
 const Zone = require('../models/Zone');
 const Reader = require('../models/Reader');
-const { sendAlertEmail } = require('./emailService');
+const { publishEmailJob } = require('./queue');
 const TagLifecycle = require('../models/TagLifecycle');
 const realtime = require('./realtime');
 
@@ -85,7 +85,7 @@ async function evaluateZoneViolation(tag, now) {
     actor: 'system',
     details: 'Zone violation detected'
   });
-  await sendAlertEmail(tag, 'ALARM');
+  publishEmailJob({ tagId: tag.tagId, type: 'ALARM' });
   tag.lastEmailSentAt = new Date();
   // note: do not emit here; caller will save tag and emit populated tag after save
   return { violation: true, resolved: false };
