@@ -6,10 +6,7 @@ const settingsSchema = new mongoose.Schema({
   alarmVolume: { type: Number, default: 80, min: 0, max: 100 },
   alarmMuted: { type: Boolean, default: false },
   emailRepeatIntervalSec: { type: Number, default: 3600 },
-  overdueEmailRepeatIntervalSec: { type: Number, default: 86400 },
-  smsEnabled: { type: Boolean, default: false },
-  smsEscalationDelaySec: { type: Number, default: 1800 },
-  smsRepeatIntervalSec: { type: Number, default: 3600 }
+  overdueEmailRepeatIntervalSec: { type: Number, default: 86400 }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Settings', settingsSchema);

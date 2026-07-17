@@ -9,12 +9,12 @@ export default function TrendChart({ data = [], width = 720, height = 180, paddi
       <svg width={Math.max(width, data.length * 14)} height={height} viewBox={`0 0 ${Math.max(width, data.length * 14)} ${height}`}>
         <defs>
           <linearGradient id="g1" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.8" />
+            <stop offset="0%" stopColor="#c8a75b" stopOpacity="0.98" />
+            <stop offset="100%" stopColor="#8f6b24" stopOpacity="0.82" />
           </linearGradient>
           <linearGradient id="g2" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#f97316" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#fb923c" stopOpacity="0.8" />
+            <stop offset="0%" stopColor="#f4d890" stopOpacity="0.95" />
+            <stop offset="100%" stopColor="#b8892e" stopOpacity="0.8" />
           </linearGradient>
         </defs>
         {/* grid lines */}

@@ -19,8 +19,8 @@ router.get('/', async (req, res, next) => {
 
 router.post('/', validateBody(['email', 'name', 'role']), async (req, res, next) => {
   try {
-    const { email, name, phone, role } = req.body;
-    const recipient = await Recipient.create({ email, name, phone, role });
+    const { email, name, role } = req.body;
+    const recipient = await Recipient.create({ email, name, role });
     res.status(201).json(recipient);
   } catch (err) {
     next(err);
@@ -29,8 +29,8 @@ router.post('/', validateBody(['email', 'name', 'role']), async (req, res, next)
 
 router.put('/:id', validateBody(['email', 'name', 'role']), async (req, res, next) => {
   try {
-    const { email, name, phone, role } = req.body;
-    const recipient = await Recipient.findByIdAndUpdate(req.params.id, { email, name, phone, role }, { new: true });
+    const { email, name, role } = req.body;
+    const recipient = await Recipient.findByIdAndUpdate(req.params.id, { email, name, role }, { new: true });
     if (!recipient) return res.status(404).json({ error: 'Recipient not found' });
     res.json(recipient);
   } catch (err) {

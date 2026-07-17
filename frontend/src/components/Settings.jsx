@@ -35,24 +35,16 @@ export default function Settings() {
       alarmRepeatIntervalSec: Number(form.alarmRepeatIntervalSec),
       alarmVolume: Number(form.alarmVolume),
       emailRepeatIntervalSec: Number(form.emailRepeatIntervalSec),
-      overdueEmailRepeatIntervalSec: Number(form.overdueEmailRepeatIntervalSec),
-      smsEnabled: Boolean(form.smsEnabled),
-      smsEscalationDelaySec: Number(form.smsEscalationDelaySec),
-      smsRepeatIntervalSec: Number(form.smsRepeatIntervalSec)
+      overdueEmailRepeatIntervalSec: Number(form.overdueEmailRepeatIntervalSec)
     }
 
-    if ([values.alarmDurationSec, values.alarmRepeatIntervalSec, values.alarmVolume, values.emailRepeatIntervalSec, values.overdueEmailRepeatIntervalSec, values.smsEscalationDelaySec, values.smsRepeatIntervalSec].some(Number.isNaN)) {
+    if ([values.alarmDurationSec, values.alarmRepeatIntervalSec, values.alarmVolume, values.emailRepeatIntervalSec, values.overdueEmailRepeatIntervalSec].some(Number.isNaN)) {
       setError('All numeric fields must be valid numbers.')
       return
     }
 
     if (values.alarmDurationSec < 1 || values.alarmRepeatIntervalSec < 1 || values.alarmVolume < 0 || values.alarmVolume > 100) {
       setError('Alarm duration and repeat interval must be at least 1 second, and volume must stay between 0 and 100.')
-      return
-    }
-
-    if (values.smsEscalationDelaySec < 0 || values.smsRepeatIntervalSec < 1) {
-      setError('SMS escalation delay must be 0 or greater, and SMS repeat interval must be at least 1 second.')
       return
     }
 
@@ -101,18 +93,6 @@ export default function Settings() {
           <label className="field-group checkbox-field">
             <input type="checkbox" name="alarmMuted" checked={form.alarmMuted} onChange={handleChange} />
             <span>Mute all alarms globally</span>
-          </label>
-          <label className="field-group checkbox-field">
-            <input type="checkbox" name="smsEnabled" checked={form.smsEnabled || false} onChange={handleChange} />
-            <span>Enable SMS escalation</span>
-          </label>
-          <label className="field-group">
-            <span>SMS escalation delay (sec)</span>
-            <input type="number" name="smsEscalationDelaySec" value={form.smsEscalationDelaySec || 1800} onChange={handleChange} min="0" />
-          </label>
-          <label className="field-group">
-            <span>SMS repeat interval (sec)</span>
-            <input type="number" name="smsRepeatIntervalSec" value={form.smsRepeatIntervalSec || 3600} onChange={handleChange} min="1" />
           </label>
           <label className="field-group">
             <span>Email repeat interval (sec)</span>

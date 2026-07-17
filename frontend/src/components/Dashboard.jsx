@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import axios from 'axios'
 import { connectRealtime, disconnectRealtime } from '../realtime'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import PieChart from './PieChart'
 import TrendChart from './TrendChart'
 
-export default function Dashboard() {
+export default function Dashboard({ siteId }) {
+  const navigate = useNavigate()
   const [tags, setTags] = useState([])
   const [settings, setSettings] = useState(null)
   const [summary, setSummary] = useState(null)
@@ -17,6 +18,8 @@ export default function Dashboard() {
   })
   const [trendEnd, setTrendEnd] = useState(() => (new Date()).toISOString().slice(0, 10))
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [tagFilter, setTagFilter] = useState('')
   const [soundEnabled, setSoundEnabled] = useState(() => {
     if (typeof window === 'undefined') return false
     return window.sessionStorage.getItem('rfid-sound-enabled') === 'true'
@@ -28,9 +31,13 @@ export default function Dashboard() {
     try {
       if (isInitial) setLoading(true)
       const res = await axios.get('/api/tags', {
+        params: siteId !== 'all-sites' ? { zone: siteId } : {},
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       })
       setTags(res.data)
+      setLoadError('')
+    } catch (err) {
+      if (isInitial) setLoadError('Unable to load tags. Check the connection and try again.')
     } finally {
       if (isInitial) setLoading(false)
     }
@@ -45,7 +52,7 @@ export default function Dashboard() {
 
   const fetchSummary = async () => {
     try {
-      const res = await axios.get('/api/reports/summary', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+      const res = await axios.get('/api/reports/summary', { params: siteId !== 'all-sites' ? { zone: siteId } : {}, headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
       setSummary(res.data)
     } catch (err) {
       setSummary(null)
@@ -67,7 +74,9 @@ export default function Dashboard() {
       if (start) qs.push(`start=${start}`)
       if (end) qs.push(`end=${end}`)
       const qstr = qs.length > 0 ? `?${qs.join('&')}` : ''
-      const res = await axios.get(`/api/reports/trends${qstr}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+      const separator = qstr ? '&' : '?'
+      const siteQuery = siteId !== 'all-sites' ? `${separator}zone=${encodeURIComponent(siteId)}` : ''
+      const res = await axios.get(`/api/reports/trends${qstr}${siteQuery}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
       setTrendData(res.data.trend || [])
     } catch (err) {
       setTrendData([])
@@ -153,7 +162,7 @@ export default function Dashboard() {
       try { sock.off('connect_error') } catch (e) {}
       disconnectRealtime()
     }
-  }, [])
+  }, [siteId])
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -241,6 +250,24 @@ export default function Dashboard() {
     return { max: Math.max(...trendData.map(item => item.total), 1) }
   }, [trendData])
 
+  const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const focusMetric = (metric) => {
+    const today = new Date()
+    if (metric === 'today') {
+      const day = today.toISOString().slice(0, 10)
+      setTrendStart(day); setTrendEnd(day); fetchTrendRange(day, day); scrollTo('violation-trend')
+    } else if (metric === 'week') {
+      const start = new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+      const end = today.toISOString().slice(0, 10)
+      setTrendStart(start); setTrendEnd(end); fetchTrendRange(start, end); scrollTo('violation-trend')
+    } else if (metric === 'resolution') {
+      navigate('/summary-report')
+    } else {
+      setTagFilter(metric); scrollTo('tag-list')
+    }
+  }
+  const visibleTags = tags.filter(tag => tagFilter === 'outside' ? !tag.currentZone : tagFilter === 'alarming' ? tag.alertStatus === 'ALARMING' : tagFilter === 'overdue' ? tag.alertStatus === 'OVERDUE' : true)
+
   return (
     <div className="page-shell">
       <audio ref={audioRef} src="/sounds/alarm.wav" preload="auto" />
@@ -268,32 +295,36 @@ export default function Dashboard() {
       )}
 
       <div className="summary-strip">
-        <span className="summary-pill healthy">● {healthy} healthy</span>
-        <span className="summary-pill warning">⚠ {activeAlarms} alarming</span>
-        <span className="summary-pill neutral">• {overdue} overdue</span>
-        <span className="summary-pill muted">• {disabled} disabled</span>
+        <button className="summary-pill healthy" onClick={() => setTagFilter('')}>● {healthy} healthy</button>
+        <button className="summary-pill alarming" onClick={() => focusMetric('alarming')}>🚨 {activeAlarms} alarming</button>
+        <button className="summary-pill overdue" onClick={() => focusMetric('overdue')}>⏱ {overdue} overdue</button>
+        <button className="summary-pill muted" onClick={() => setTagFilter('')}>• {disabled} disabled</button>
       </div>
 
       <div className="stats-grid">
-        <div className="stat-card accent-info">
+        <button className="stat-card accent-info metric-card" onClick={() => focusMetric('today')}>
           <div className="stat-title">Violations today</div>
           <div className="stat-value">{violationsToday}</div>
-        </div>
-        <div className="stat-card accent-info">
+          <span className="metric-card__hint">View daily trend →</span>
+        </button>
+        <button className="stat-card accent-info metric-card" onClick={() => focusMetric('week')}>
           <div className="stat-title">Violations this week</div>
           <div className="stat-value">{violationsWeek}</div>
-        </div>
-        <div className="stat-card accent-secondary">
+          <span className="metric-card__hint">View weekly trend →</span>
+        </button>
+        <button className="stat-card accent-secondary metric-card" onClick={() => focusMetric('resolution')}>
           <div className="stat-title">Avg resolution</div>
           <div className="stat-value">{avgResolutionMs !== null ? `${Math.round(avgResolutionMs / 1000)}s` : 'N/A'}</div>
-        </div>
-        <div className="stat-card accent-secondary">
+          <span className="metric-card__hint">Open summary report →</span>
+        </button>
+        <button className="stat-card accent-secondary metric-card" onClick={() => focusMetric('outside')}>
           <div className="stat-title">Outside lab</div>
           <div className="stat-value">{outside}</div>
-        </div>
+          <span className="metric-card__hint">View affected tags →</span>
+        </button>
       </div>
 
-      <div className="content-card">
+      <div className="content-card" id="violation-trend">
         <div className="card-header">
           <div>
             <h3>Violation trend</h3>
@@ -314,7 +345,7 @@ export default function Dashboard() {
           {trendData.length === 0 ? (
             <div className="empty-state">No trend data available yet.</div>
           ) : (
-            <TrendChart data={trendData} />
+            <TrendChart data={trendData} onBarClick={(date) => { setTrendStart(date); setTrendEnd(date); fetchTrendRange(date, date) }} />
           )}
         </div>
       </div>
@@ -327,7 +358,7 @@ export default function Dashboard() {
           </div>
         </div>
         <div style={{ padding: 16 }}>
-          <PieChart data={[
+          <PieChart onSliceClick={(slice) => focusMetric(slice.label === 'Alarming' ? 'alarming' : slice.label === 'Overdue' ? 'overdue' : '')} data={[
             { label: 'Alarming', value: summary?.alertCounts?.ALARMING ?? 0, color: '#ef4444' },
             { label: 'Overdue', value: summary?.alertCounts?.OVERDUE ?? 0, color: '#f97316' },
             { label: 'Healthy', value: summary?.alertCounts?.NONE ?? 0, color: '#10b981' }
@@ -364,21 +395,23 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="content-card">
+      <div className="content-card" id="tag-list">
         <div className="card-header">
           <div>
             <h3>All tags</h3>
-            <p className="card-copy">A live view of every tag in the lab system.</p>
+            <p className="card-copy">{tagFilter ? `Filtered view: ${tagFilter}.` : 'A live view of every tag in the lab system.'}</p>
           </div>
           <div className="chip-row">
-            <span className="chip">{tags.length} total</span>
+            <button className="chip" onClick={() => setTagFilter('')}>{tags.length} total</button>
             <span className="chip chip-warning">{activeAlarms} alarming</span>
           </div>
         </div>
 
-        {loading ? (
+        {loadError ? (
+          <div className="empty-state" role="alert">{loadError}</div>
+        ) : loading ? (
           <div className="loading-state">Loading tags…</div>
-        ) : tags.length === 0 ? (
+        ) : visibleTags.length === 0 ? (
           <div className="empty-state">No tags have been created yet.</div>
         ) : (
           <div className="table-wrapper">
@@ -394,11 +427,12 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {tags.map(tag => (
-                  <tr key={tag._id} className={tag.alertStatus !== 'NONE' ? 'alert-row' : ''}>
+                {visibleTags.map(tag => (
+                  <tr key={tag._id} className={`tag-row ${tag.alertStatus === 'ALARMING' ? 'tag-row--alarming' : tag.alertStatus === 'OVERDUE' ? 'tag-row--overdue' : ''}`}>
                     <td>
                       <div className="table-main"><Link to={`/tags/${tag._id}/history`}>{tag.tagId}</Link></div>
-                      {tag.alertStatus === 'ALARMING' && <div className="table-meta">Needs attention</div>}
+                      {tag.alertStatus === 'ALARMING' && <div className="table-meta">🚨 Immediate attention required</div>}
+                      {tag.alertStatus === 'OVERDUE' && <div className="table-meta">⏱ Return or resolve overdue item</div>}
                     </td>
                     <td>{tag.equipment?.name || 'N/A'}</td>
                     <td>{tag.status}</td>
@@ -406,7 +440,7 @@ export default function Dashboard() {
                     <td>{tag.currentZone?.name || 'Outside all zones'}</td>
                     <td>
                       <span className={`status-pill ${tag.alertStatus === 'ALARMING' ? 'danger' : tag.alertStatus === 'OVERDUE' ? 'warning' : 'neutral'}`}>
-                        {tag.alertStatus}
+                        {tag.alertStatus === 'ALARMING' ? '🚨 ALARMING' : tag.alertStatus === 'OVERDUE' ? '⏱ OVERDUE' : 'NO ALERT'}
                       </span>
                     </td>
                   </tr>

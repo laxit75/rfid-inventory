@@ -1,0 +1,11 @@
+import { useEffect, useState } from 'react'
+import api from '../api'
+
+export default function ManageSites() {
+  const [sites, setSites] = useState([]); const [name, setName] = useState(''); const [description, setDescription] = useState(''); const [message, setMessage] = useState('')
+  const load = () => api.get('/api/zones').then(response => setSites(response.data)).catch(() => setMessage('Unable to load sites.'))
+  useEffect(() => { load() }, [])
+  const create = async event => { event.preventDefault(); try { await api.post('/api/zones', { name, description }); setName(''); setDescription(''); setMessage('Site added.'); load() } catch (error) { setMessage(error.response?.data?.error || 'Unable to add site.') } }
+  const remove = async id => { if (!window.confirm('Remove this site?')) return; try { await api.delete(`/api/zones/${id}`); setMessage('Site removed.'); load() } catch { setMessage('Unable to remove site.') } }
+  return <div className="page-shell"><div className="page-head"><div><p className="eyebrow">Administration</p><h2>Manage sites</h2><p className="page-subtitle">RFID sites are backed by lab zones and appear in the functional site switcher.</p></div></div>{message && <div className="inline-banner info">{message}</div>}<section className="content-card"><form onSubmit={create} className="form-grid"><label className="field-group"><span>Site name</span><input required value={name} onChange={event => setName(event.target.value)} placeholder="New lab site" /></label><label className="field-group"><span>Description</span><input value={description} onChange={event => setDescription(event.target.value)} placeholder="Optional location note" /></label><div className="form-actions"><button className="button">Add site</button></div></form></section><section className="content-card"><div className="table-wrapper"><table className="data-table"><thead><tr><th>Site</th><th>Description</th><th>Action</th></tr></thead><tbody>{sites.map(site => <tr key={site._id}><td>{site.name}</td><td>{site.description || '—'}</td><td><button className="button button-ghost" onClick={() => remove(site._id)}>Remove</button></td></tr>)}</tbody></table>{!sites.length && <div className="empty-state">No sites configured.</div>}</div></section></div>
+}

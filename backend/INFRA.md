@@ -30,7 +30,7 @@ WantedBy=multi-user.target
    - Schedule regular backups using `mongodump` to an off-host location.
 
 4. Secrets
-   - Store `JWT_SECRET`, SMTP credentials, and optional Twilio secrets in a secure vault or OS environment (do not commit `.env` with secrets).
+   - Store `JWT_SECRET` and SMTP credentials in a secure vault or OS environment (do not commit `.env` with secrets).
 
 5. Monitoring
    - Add a cron or monitoring check against `/api/health`. Configure alerts for service down or leader changes.

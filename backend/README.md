@@ -11,6 +11,16 @@ This document covers runtime notes for production-ready features implemented in 
 - `JWT_SECRET` — JWT signing secret
 - `USE_CHANGE_STREAMS` — set to `true` to prefer MongoDB Change Streams as the authoritative realtime source (requires replica set)
 - `ALLOWED_ORIGINS` — comma-separated frontend origins for CORS
+- `RABBITMQ_URL` — RabbitMQ connection URL used for durable email delivery
+- `RFID_WEBHOOK_SECRET` — shared secret required by `/api/rfid/*` hardware webhooks
+
+## RabbitMQ email queue
+- Business logic publishes alarm and overdue notifications to the durable `email_alerts` queue.
+- The elected leader runs the email worker. It sends through SMTP, acknowledges successful sends, and dead-letters failures to `email_alerts_dlq`.
+
+## RFID hardware ingestion
+- Use `POST /api/rfid/debug` with an `x-rfid-secret` header first for every reader installation; it logs the raw payload for parser confirmation.
+- `POST /api/rfid/ingest` uses the configured `Reader` antenna port and direction to invoke the existing entry/exit state machine.
 
 ## Change Streams
 - The backend includes `services/changeStream.js` which opens a change stream on the `Tag` collection with `fullDocument: 'updateLookup'` and emits populated tag payloads over Socket.io.

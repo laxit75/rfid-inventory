@@ -21,7 +21,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // Update settings (admin only, password-protected via admin middleware)
-router.put('/', admin, validateBody(['alarmDurationSec', 'alarmRepeatIntervalSec', 'alarmVolume', 'alarmMuted', 'emailRepeatIntervalSec', 'overdueEmailRepeatIntervalSec', 'smsEnabled', 'smsEscalationDelaySec', 'smsRepeatIntervalSec']), async (req, res, next) => {
+router.put('/', admin, validateBody(['alarmDurationSec', 'alarmRepeatIntervalSec', 'alarmVolume', 'alarmMuted', 'emailRepeatIntervalSec', 'overdueEmailRepeatIntervalSec']), async (req, res, next) => {
   try {
     const updates = req.body;
     const settings = await Settings.findOneAndUpdate({}, updates, { new: true, upsert: true });

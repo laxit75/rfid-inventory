@@ -3,9 +3,9 @@ import axios from 'axios'
 
 export default function Recipients() {
   const [recipients, setRecipients] = useState([])
-  const [newRecipient, setNewRecipient] = useState({ email: '', name: '', phone: '', role: 'SUPPORT' })
+  const [newRecipient, setNewRecipient] = useState({ email: '', name: '', role: 'SUPPORT' })
   const [editId, setEditId] = useState(null)
-  const [editForm, setEditForm] = useState({ email: '', name: '', phone: '', role: 'SUPPORT' })
+  const [editForm, setEditForm] = useState({ email: '', name: '', role: 'SUPPORT' })
   const [loading, setLoading] = useState(true)
   const [formError, setFormError] = useState('')
   const [feedback, setFeedback] = useState('')
@@ -33,7 +33,7 @@ export default function Recipients() {
     try {
       await axios.post('/api/recipients', newRecipient, { headers: { Authorization: `Bearer ${token}` } })
       setFeedback('Recipient added successfully.')
-      setNewRecipient({ email: '', name: '', phone: '', role: 'SUPPORT' })
+      setNewRecipient({ email: '', name: '', role: 'SUPPORT' })
       fetchRecipients()
     } catch (err) {
       setFormError(err.response?.data?.error || 'Unable to add recipient.')
@@ -54,7 +54,7 @@ export default function Recipients() {
 
   const handleEditStart = (recipient) => {
     setEditId(recipient._id)
-    setEditForm({ email: recipient.email, name: recipient.name, phone: recipient.phone || '', role: recipient.role || 'SUPPORT' })
+    setEditForm({ email: recipient.email, name: recipient.name, role: recipient.role || 'SUPPORT' })
   }
 
   const handleEditSave = async () => {
@@ -81,7 +81,7 @@ export default function Recipients() {
         <div>
           <p className="eyebrow">Admin</p>
           <h2>Alert recipients</h2>
-          <p className="page-subtitle">Manage email and SMS recipients for RFID alert escalation.</p>
+          <p className="page-subtitle">Manage email recipients for RFID alert escalation.</p>
         </div>
       </div>
 
@@ -115,7 +115,6 @@ export default function Recipients() {
                 <tr>
                   <th>Name</th>
                   <th>Email</th>
-                  <th>Phone</th>
                   <th>Role</th>
                   <th>Actions</th>
                 </tr>
@@ -127,7 +126,6 @@ export default function Recipients() {
                       <>
                         <td><input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} /></td>
                         <td><input value={editForm.email} onChange={e => setEditForm({ ...editForm, email: e.target.value })} /></td>
-                        <td><input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} /></td>
                         <td>
                           <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })}>
                             <option value="SUPPORT">Support</option>
@@ -146,7 +144,6 @@ export default function Recipients() {
                       <>
                         <td>{r.name}</td>
                         <td>{r.email}</td>
-                        <td>{r.phone || '—'}</td>
                         <td>{r.role}</td>
                         <td>
                           <div className="button-row">

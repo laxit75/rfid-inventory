@@ -1,0 +1,8 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+
+export default function ReportBuilder() {
+  const [from, setFrom] = useState(''); const [to, setTo] = useState(''); const [include, setInclude] = useState({ alerts: true, movements: true, devices: false }); const navigate = useNavigate()
+  const build = event => { event.preventDefault(); const params = new URLSearchParams(); if (from) params.set('start', from); if (to) params.set('end', to); params.set('include', Object.entries(include).filter(([, value]) => value).map(([key]) => key).join(',')); navigate(`/full-report?${params}`) }
+  return <div className="page-shell"><div className="page-head"><div><p className="eyebrow">Reporting</p><h2>Report builder</h2><p className="page-subtitle">Choose a reporting period and data sections, then open the detailed RFID report.</p></div></div><section className="content-card"><form className="form-grid" onSubmit={build}><label className="field-group"><span>From</span><input type="date" value={from} onChange={event => setFrom(event.target.value)} /></label><label className="field-group"><span>To</span><input type="date" value={to} onChange={event => setTo(event.target.value)} /></label><div className="report-options">{Object.entries({ alerts: 'Alert activity', movements: 'Movement events', devices: 'Device inventory' }).map(([key, label]) => <label key={key}><input type="checkbox" checked={include[key]} onChange={event => setInclude({ ...include, [key]: event.target.checked })} /> {label}</label>)}</div><div className="form-actions"><button className="button">Build report</button></div></form></section></div>
+}

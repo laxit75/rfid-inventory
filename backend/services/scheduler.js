@@ -1,7 +1,7 @@
 const Tag = require('../models/Tag');
 const Settings = require('../models/Settings');
 const AlertLog = require('../models/AlertLog');
-const { sendAlertEmail, sendAlertSms } = require('./emailService');
+const { publishEmailJob } = require('./queue');
 const logger = require('../utils/logger');
 
 let intervalId;
@@ -36,12 +36,8 @@ async function processTags() {
       tag.overdueAlertStart = now;
       logger.info('Overdue alert triggered', { tagId: tag.tagId });
       try {
-        await sendAlertEmail(tag, 'OVERDUE');
+        publishEmailJob({ tagId: tag.tagId, type: 'OVERDUE' });
         tag.lastOverdueEmailSentAt = new Date();
-        if (settings.smsEnabled && settings.smsEscalationDelaySec <= 0) {
-          await sendAlertSms(tag, 'OVERDUE');
-          tag.lastOverdueSmsSentAt = new Date();
-        }
         await tag.save();
       } catch (err) {
         logger.error('Failed to process overdue alert', { tagId: tag.tagId, error: err.message });
@@ -57,8 +53,6 @@ async function processTags() {
       const silenced = tag.silenced || settings.alarmMuted;
       const beepInterval = settings.alarmRepeatIntervalSec * 1000;
       const emailInterval = settings.emailRepeatIntervalSec * 1000;
-      const smsEscalationDelay = settings.smsEscalationDelaySec * 1000;
-      const smsRepeatInterval = settings.smsRepeatIntervalSec * 1000;
 
       if (!silenced && tag.lastAlarmBeepAt && (now - tag.lastAlarmBeepAt >= beepInterval)) {
         await AlertLog.create({
@@ -74,7 +68,7 @@ async function processTags() {
 
       if (tag.lastEmailSentAt && (now - tag.lastEmailSentAt >= emailInterval)) {
         try {
-          await sendAlertEmail(tag, 'ALARM');
+          publishEmailJob({ tagId: tag.tagId, type: 'ALARM' });
           tag.lastEmailSentAt = new Date();
           await tag.save();
         } catch (err) {
@@ -82,21 +76,6 @@ async function processTags() {
         }
       }
 
-      if (settings.smsEnabled && tag.lastEmailSentAt) {
-        try {
-          if (!tag.lastSmsSentAt && (now - tag.lastEmailSentAt >= smsEscalationDelay)) {
-            await sendAlertSms(tag, 'ALARM');
-            tag.lastSmsSentAt = new Date();
-            await tag.save();
-          } else if (tag.lastSmsSentAt && (now - tag.lastSmsSentAt >= smsRepeatInterval)) {
-            await sendAlertSms(tag, 'ALARM');
-            tag.lastSmsSentAt = new Date();
-            await tag.save();
-          }
-        } catch (err) {
-          logger.error('Failed to send alarm SMS', { tagId: tag.tagId, error: err.message });
-        }
-      }
     }
 
     // 3. Overdue email repeat logic for OVERDUE tags
@@ -106,12 +85,10 @@ async function processTags() {
 
     for (const tag of overdueTags) {
       const overdueEmailInterval = settings.overdueEmailRepeatIntervalSec * 1000;
-      const smsEscalationDelay = settings.smsEscalationDelaySec * 1000;
-      const smsRepeatInterval = settings.smsRepeatIntervalSec * 1000;
 
       if (tag.lastOverdueEmailSentAt && (now - tag.lastOverdueEmailSentAt >= overdueEmailInterval)) {
         try {
-          await sendAlertEmail(tag, 'OVERDUE');
+          publishEmailJob({ tagId: tag.tagId, type: 'OVERDUE' });
           tag.lastOverdueEmailSentAt = new Date();
           await tag.save();
         } catch (err) {
@@ -119,21 +96,6 @@ async function processTags() {
         }
       }
 
-      if (settings.smsEnabled && tag.overdueAlertStart) {
-        try {
-          if (!tag.lastOverdueSmsSentAt && (now - tag.overdueAlertStart >= smsEscalationDelay)) {
-            await sendAlertSms(tag, 'OVERDUE');
-            tag.lastOverdueSmsSentAt = new Date();
-            await tag.save();
-          } else if (tag.lastOverdueSmsSentAt && (now - tag.lastOverdueSmsSentAt >= smsRepeatInterval)) {
-            await sendAlertSms(tag, 'OVERDUE');
-            tag.lastOverdueSmsSentAt = new Date();
-            await tag.save();
-          }
-        } catch (err) {
-          logger.error('Failed to send overdue SMS', { tagId: tag.tagId, error: err.message });
-        }
-      }
     }
   } catch (err) {
     logger.error('Scheduler error', { error: err.message });

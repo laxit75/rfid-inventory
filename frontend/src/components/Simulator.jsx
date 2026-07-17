@@ -6,7 +6,7 @@ export default function Simulator() {
   const [tags, setTags] = useState([])
   const [selectedTagId, setSelectedTagId] = useState('')
   const [selectedReader, setSelectedReader] = useState('Shutter-1')
-  const [statusMsg, setStatusMsg] = useState('')
+  const [feedbackMessage, setFeedbackMessage] = useState('')
   const [statusTone, setStatusTone] = useState('info')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -57,7 +57,7 @@ export default function Simulator() {
     if (selectedTagId && !tags.some(tag => tag.tagId === selectedTagId)) {
       setSelectedTagId('')
       setStatusTone('info')
-      setStatusMsg('The previously selected tag is no longer available. Please choose another one.')
+      setFeedbackMessage('The previously selected tag is no longer available. Please choose another one.')
     }
   }, [selectedTagId, tags])
 
@@ -70,11 +70,11 @@ export default function Simulator() {
         readerId: selectedReader
       })
       setStatusTone('success')
-      setStatusMsg(`Event processed: ${res.data.movement || 'OK'}`)
+      setFeedbackMessage(`Event processed: ${res.data.movement || 'OK'}`)
       fetchTags(false)
     } catch (err) {
       setStatusTone('error')
-      setStatusMsg(`Error: ${err.response?.data?.error || err.message}`)
+      setFeedbackMessage(`Error: ${err.response?.data?.error || err.message}`)
     } finally {
       setBusy(false)
     }
@@ -128,9 +128,9 @@ export default function Simulator() {
           </div>
         </div>
 
-        {statusMsg && (
+        {feedbackMessage && (
           <div className={`inline-banner ${statusTone === 'success' ? 'success' : 'error'}`}>
-            {statusMsg}
+            {feedbackMessage}
           </div>
         )}
 

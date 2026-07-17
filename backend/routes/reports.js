@@ -8,32 +8,43 @@ router.use(auth);
 
 const toDateOnly = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
+async function scopedTagIds(zoneId) {
+  if (!zoneId) return null;
+  const tags = await Tag.find({ $or: [{ assignedZone: zoneId }, { currentZone: zoneId }] }).select('_id').lean();
+  return tags.map((tag) => tag._id);
+}
+
 // GET /api/reports/summary
 // returns totals by tag status, violations today/week, and avg time-to-resolution (ms)
 router.get('/summary', async (req, res, next) => {
   try {
+    const tagIds = await scopedTagIds(req.query.zone);
+    const tagFilter = tagIds ? { _id: { $in: tagIds } } : {};
+    const alertFilter = tagIds ? { tag: { $in: tagIds } } : {};
     const now = new Date();
     const startOfToday = toDateOnly(now);
     const weekAgo = new Date(startOfToday.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     const totalsAgg = await Tag.aggregate([
+      { $match: tagFilter },
       { $group: { _id: '$status', count: { $sum: 1 } } }
     ]);
     const totals = { ACTIVE: 0, TEMP_DISABLED: 0, PERMANENT_DISABLED: 0 };
     for (const t of totalsAgg) totals[t._id] = t.count;
 
     const alertAgg = await Tag.aggregate([
+      { $match: tagFilter },
       { $group: { _id: '$alertStatus', count: { $sum: 1 } } }
     ]);
     const alertCounts = { NONE: 0, ALARMING: 0, OVERDUE: 0 };
     for (const a of alertAgg) alertCounts[a._id] = a.count;
 
-    const outsideCount = await Tag.countDocuments({ currentZone: null });
-    const violationsToday = await AlertLog.countDocuments({ type: 'ALARM_BEEP', timestamp: { $gte: startOfToday } });
-    const violationsWeek = await AlertLog.countDocuments({ type: 'ALARM_BEEP', timestamp: { $gte: weekAgo } });
+    const outsideCount = await Tag.countDocuments({ ...tagFilter, currentZone: null });
+    const violationsToday = await AlertLog.countDocuments({ ...alertFilter, type: 'ALARM_BEEP', timestamp: { $gte: startOfToday } });
+    const violationsWeek = await AlertLog.countDocuments({ ...alertFilter, type: 'ALARM_BEEP', timestamp: { $gte: weekAgo } });
 
-    const resolved = await AlertLog.find({ type: 'ALARM_RESOLVED' }).sort({ timestamp: -1 }).limit(500).lean();
-    const beeps = await AlertLog.find({ type: 'ALARM_BEEP' }).sort({ timestamp: -1 }).limit(2000).lean();
+    const resolved = await AlertLog.find({ ...alertFilter, type: 'ALARM_RESOLVED' }).sort({ timestamp: -1 }).limit(500).lean();
+    const beeps = await AlertLog.find({ ...alertFilter, type: 'ALARM_BEEP' }).sort({ timestamp: -1 }).limit(2000).lean();
     const beepMap = {};
     for (const b of beeps) {
       const key = String(b.tagId || b.tag);
@@ -64,6 +75,8 @@ router.get('/summary', async (req, res, next) => {
 // returns daily violation counts for the last N days
 router.get('/trends', async (req, res, next) => {
   try {
+    const tagIds = await scopedTagIds(req.query.zone);
+    const alertScope = tagIds ? { tag: { $in: tagIds } } : {};
     // Support either ?days=N OR ?start=YYYY-MM-DD&end=YYYY-MM-DD
     if (req.query.start || req.query.end) {
       const start = req.query.start ? new Date(req.query.start) : new Date(0);
@@ -73,7 +86,7 @@ router.get('/trends', async (req, res, next) => {
       const endDate = toDateOnly(end);
       // build pipeline for given range
       const pipeline = [
-        { $match: { type: 'ALARM_BEEP', timestamp: { $gte: startDate, $lte: new Date(endDate.getTime() + 24 * 60 * 60 * 1000 - 1) } } },
+        { $match: { ...alertScope, type: 'ALARM_BEEP', timestamp: { $gte: startDate, $lte: new Date(endDate.getTime() + 24 * 60 * 60 * 1000 - 1) } } },
         {
           $group: {
             _id: {
@@ -113,7 +126,7 @@ router.get('/trends', async (req, res, next) => {
     const startDate = new Date(today.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
 
     const pipeline = [
-      { $match: { type: 'ALARM_BEEP', timestamp: { $gte: startDate } } },
+      { $match: { ...alertScope, type: 'ALARM_BEEP', timestamp: { $gte: startDate } } },
       {
         $group: {
           _id: {
@@ -155,7 +168,8 @@ router.get('/audit.csv', async (req, res, next) => {
     const end = req.query.end ? new Date(req.query.end) : new Date();
     end.setHours(23, 59, 59, 999);
 
-    const logs = await AlertLog.find({ timestamp: { $gte: start, $lte: end } }).sort({ timestamp: 1 }).lean();
+    const tagIds = await scopedTagIds(req.query.zone);
+    const logs = await AlertLog.find({ ...(tagIds ? { tag: { $in: tagIds } } : {}), timestamp: { $gte: start, $lte: end } }).sort({ timestamp: 1 }).lean();
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="rfid-audit-${req.query.start || 'all'}-${req.query.end || 'latest'}.csv"`);

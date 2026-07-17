@@ -22,10 +22,12 @@ export default function Login({ onLogin }) {
   }
 
   return (
-    <div className="login-container">
+    <div className="login-container login-screen">
       <form onSubmit={handleSubmit} className="login-form">
-        <h2>RFID System Login</h2>
-        <p className="page-subtitle">Sign in to view live inventory activity and alarm status.</p>
+        <div className="login-avatar">RF</div>
+        <p className="eyebrow">Secure operations</p>
+        <h2>Welcome back</h2>
+        <p className="page-subtitle">Sign in to view live inventory activity, devices, and reports.</p>
         {error && <div className="inline-banner error">{error}</div>}
         <label className="field-group">
           <span>Username</span>
@@ -35,7 +37,8 @@ export default function Login({ onLogin }) {
           <span>Password</span>
           <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </label>
-        <button className="button" type="submit" disabled={loading}>{loading ? 'Signing in…' : 'Login'}</button>
+        <button className="button login-submit" type="submit" disabled={loading}>{loading ? 'Signing in…' : 'Log in to dashboard'}</button>
+        <div className="login-note"><span>RFID Inventory</span><span>Secure lab access</span></div>
         <p className="hint">Default admin: admin / admin123</p>
       </form>
     </div>

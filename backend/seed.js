@@ -33,10 +33,12 @@ async function seed() {
   const zoneA = await Zone.create({ name: 'Zone A - Test Bay', description: 'Primary test bay' });
   const zoneB = await Zone.create({ name: 'Zone B - Paint Shop', description: 'Paint and finishing zone' });
 
-  // Create readers and associate with zones
+  // Each physical gate uses two antenna ports: one for exit and one for entry.
   await Reader.create([
-    { readerId: 'Shutter-1', name: 'Zone A - Test Bay', description: 'Primary test bay reader', zone: zoneA._id, status: 'ONLINE' },
-    { readerId: 'Shutter-2', name: 'Zone B - Paint Shop', description: 'Paint and finishing zone reader', zone: zoneB._id, status: 'ONLINE' }
+    { readerId: 'Shutter-1', name: 'Zone A - Test Bay exit', description: 'North gate exit antenna', zone: zoneA._id, antennaPort: 1, direction: 'EXIT', status: 'ONLINE' },
+    { readerId: 'Shutter-1-Entry', name: 'Zone A - Test Bay entry', description: 'North gate entry antenna', zone: zoneA._id, antennaPort: 2, direction: 'ENTRY', status: 'ONLINE' },
+    { readerId: 'Shutter-2', name: 'Zone B - Paint Shop exit', description: 'South gate exit antenna', zone: zoneB._id, antennaPort: 3, direction: 'EXIT', status: 'ONLINE' },
+    { readerId: 'Shutter-2-Entry', name: 'Zone B - Paint Shop entry', description: 'South gate entry antenna', zone: zoneB._id, antennaPort: 4, direction: 'ENTRY', status: 'ONLINE' }
   ]);
 
   // Create sample equipment

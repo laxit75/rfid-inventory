@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const { startScheduler, stopScheduler } = require('./services/scheduler');
+const { startEmailWorker, stopEmailWorker } = require('./workers/emailWorker');
 const { startChangeStream, stopChangeStream } = require('./services/changeStream');
 const Zone = require('./models/Zone');
 const logger = require('./utils/logger');
@@ -32,7 +33,7 @@ app.use(cors({
   origin: allowedOrigins,
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ verify: (req, res, buffer) => { req.rawBody = buffer.toString('utf8'); } }));
 
 const loginRateLimitWindowMs = process.env.LOGIN_LIMIT_WINDOW_MS ? Number(process.env.LOGIN_LIMIT_WINDOW_MS) : 15 * 60 * 1000;
 const loginRateLimitMax = process.env.LOGIN_LIMIT_MAX ? Number(process.env.LOGIN_LIMIT_MAX) : 10;
@@ -52,12 +53,14 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tags', require('./routes/tags'));
 app.use('/api/equipment', require('./routes/equipment'));
 app.use('/api', require('./routes/movement'));
+app.use('/api/rfid', require('./routes/rfidIngest'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/recipients', require('./routes/recipients'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/audit', require('./routes/audit'));
 app.use('/api/zones', require('./routes/zones'));
+app.use('/api/readers', require('./routes/readers'));
 app.use(errorHandler);
 
 let server;
@@ -80,10 +83,12 @@ function connectWithRetry() {
           onAcquire: async () => {
             try { await startChangeStream(); } catch (e) {}
             try { startScheduler(); } catch (e) {}
+            try { await startEmailWorker(); } catch (e) {}
           },
           onRelease: async () => {
             try { stopChangeStream(); } catch (e) {}
             try { stopScheduler(); } catch (e) {}
+            try { await stopEmailWorker(); } catch (e) {}
           }
         });
       const PORT = process.env.PORT || 5000;

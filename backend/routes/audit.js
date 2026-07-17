@@ -1,6 +1,7 @@
 const express = require('express');
 const MovementEvent = require('../models/MovementEvent');
 const AlertLog = require('../models/AlertLog');
+const Tag = require('../models/Tag');
 const auth = require('../middleware/auth');
 const router = express.Router();
 
@@ -8,9 +9,13 @@ router.use(auth);
 
 router.get('/movements', async (req, res, next) => {
   try {
-    const { tagId, start, end } = req.query;
+    const { tagId, start, end, zone } = req.query;
     const filter = {};
     if (tagId) filter.tagId = tagId;
+    if (zone) {
+      const tags = await Tag.find({ $or: [{ assignedZone: zone }, { currentZone: zone }] }).select('_id').lean();
+      filter.tag = { $in: tags.map((tag) => tag._id) };
+    }
     if (start || end) {
       filter.createdAt = {};
       if (start) filter.createdAt.$gte = new Date(start);
@@ -25,9 +30,13 @@ router.get('/movements', async (req, res, next) => {
 
 router.get('/alerts', async (req, res, next) => {
   try {
-    const { tagId, start, end } = req.query;
+    const { tagId, start, end, zone } = req.query;
     const filter = {};
     if (tagId) filter.tagId = tagId;
+    if (zone) {
+      const tags = await Tag.find({ $or: [{ assignedZone: zone }, { currentZone: zone }] }).select('_id').lean();
+      filter.tag = { $in: tags.map((tag) => tag._id) };
+    }
     if (start || end) {
       filter.timestamp = {};
       if (start) filter.timestamp.$gte = new Date(start);

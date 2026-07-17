@@ -12,7 +12,7 @@ function describeArc(cx, cy, r, startAngle, endAngle) {
   return [`M ${cx} ${cy}`, `L ${start.x} ${start.y}`, `A ${r} ${r} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`, 'Z'].join(' ')
 }
 
-export default function PieChart({ data = [], size = 160, innerRadius = 48 }) {
+export default function PieChart({ data = [], size = 160, innerRadius = 48, onSliceClick = () => {} }) {
   const total = data.reduce((s, d) => s + Math.max(0, d.value), 0) || 1
   const cx = size / 2
   const cy = size / 2
@@ -55,22 +55,23 @@ export default function PieChart({ data = [], size = 160, innerRadius = 48 }) {
           if (value === 0) return null
           const path = describeArc(cx, cy, r, start, end)
           const pct = Math.round((value / total) * 100)
+          const interactionProps = {
+            fill: slice.color || '#888',
+            stroke: '#fff',
+            strokeWidth: '1',
+            style: { transition: 'transform 180ms ease, opacity 180ms ease', transformOrigin: `${cx}px ${cy}px`, transform: hovered === idx ? 'scale(1.04)' : 'scale(1)', cursor: 'pointer' },
+            onMouseEnter: (e) => handleEnter(e, idx, slice, pct),
+            onMouseMove: handleMove,
+            onMouseLeave: handleLeave,
+            onClick: () => onSliceClick(slice)
+          }
           // label position
           const labelRad = innerRadius + (r - innerRadius) / 2
           const labelPos = polarToCartesian(cx, cy, labelRad, mid)
 
           return (
             <g key={idx}>
-              <path
-                d={path}
-                fill={slice.color || '#888'}
-                stroke="#fff"
-                strokeWidth="1"
-                style={{ transition: 'transform 180ms ease, opacity 180ms ease', transformOrigin: `${cx}px ${cy}px`, transform: hovered === idx ? 'scale(1.04)' : 'scale(1)' }}
-                onMouseEnter={(e) => handleEnter(e, idx, slice, pct)}
-                onMouseMove={handleMove}
-                onMouseLeave={handleLeave}
-              />
+              {angleDelta >= 359.999 ? <circle cx={cx} cy={cy} r={r} {...interactionProps} /> : <path d={path} {...interactionProps} />}
               {pct >= 6 && (
                 <text x={labelPos.x} y={labelPos.y} fontSize={Math.max(10, Math.min(14, Math.round(size / 14)))} textAnchor="middle" fill="#fff" style={{ pointerEvents: 'none', fontWeight: 600 }}>
                   {pct}%

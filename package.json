@@ -8,5 +8,8 @@
   },
   "devDependencies": {
     "concurrently": "^8.0.1"
+  },
+  "dependencies": {
+    "openai": "^6.46.0"
   }
 }
