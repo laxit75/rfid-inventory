@@ -5,6 +5,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const { startScheduler, stopScheduler } = require('./services/scheduler');
 const { startEmailWorker, stopEmailWorker } = require('./workers/emailWorker');
+const { startSpeakerWorker, stopSpeakerWorker } = require('./workers/speakerWorker');
 const { startChangeStream, stopChangeStream } = require('./services/changeStream');
 const Zone = require('./models/Zone');
 const logger = require('./utils/logger');
@@ -61,6 +62,7 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/audit', require('./routes/audit'));
 app.use('/api/zones', require('./routes/zones'));
 app.use('/api/readers', require('./routes/readers'));
+app.use('/api/devices', require('./routes/devices'));
 app.use(errorHandler);
 
 let server;
@@ -84,11 +86,13 @@ function connectWithRetry() {
             try { await startChangeStream(); } catch (e) {}
             try { startScheduler(); } catch (e) {}
             try { await startEmailWorker(); } catch (e) {}
+            try { await startSpeakerWorker(); } catch (e) {}
           },
           onRelease: async () => {
             try { stopChangeStream(); } catch (e) {}
             try { stopScheduler(); } catch (e) {}
             try { await stopEmailWorker(); } catch (e) {}
+            try { await stopSpeakerWorker(); } catch (e) {}
           }
         });
       const PORT = process.env.PORT || 5000;
@@ -173,3 +177,4 @@ require('./models/User');
 require('./models/Recipient');
 require('./models/Settings');
 require('./models/Zone');
+require('./models/Device');

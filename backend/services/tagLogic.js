@@ -3,16 +3,10 @@ const MovementEvent = require('../models/MovementEvent');
 const AlertLog = require('../models/AlertLog');
 const Zone = require('../models/Zone');
 const Reader = require('../models/Reader');
-const { publishEmailJob } = require('./queue');
 const TagLifecycle = require('../models/TagLifecycle');
 const realtime = require('./realtime');
 
-/**
- * Resolve a Zone from a readerId by looking up the Reader document.
- * If a Reader exists and references a Zone, return the populated Zone.
- * If the Reader exists but has no zone, and the Reader has a name,
- * attempt to find or create a Zone with that name and attach it.
- */
+
 async function getZoneByReader(readerId) {
   if (!readerId) return null;
   const reader = await Reader.findOne({ readerId }).populate('zone');
@@ -85,7 +79,6 @@ async function evaluateZoneViolation(tag, now) {
     actor: 'system',
     details: 'Zone violation detected'
   });
-  publishEmailJob({ tagId: tag.tagId, type: 'ALARM' });
   tag.lastEmailSentAt = new Date();
   // note: do not emit here; caller will save tag and emit populated tag after save
   return { violation: true, resolved: false };

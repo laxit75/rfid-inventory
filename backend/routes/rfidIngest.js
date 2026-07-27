@@ -1,6 +1,7 @@
 const express = require('express');
 const Reader = require('../models/Reader');
 const { handleExit, handleReturn } = require('../services/tagLogic');
+const { handleTagEvent } = require('../services/tagAlertService');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -71,6 +72,14 @@ router.post('/ingest', async (req, res, next) => {
       const result = reader.direction === 'EXIT'
         ? await handleExit(tagId, reader.readerId)
         : await handleReturn(tagId, reader.readerId);
+
+      const isViolation = reader.direction === 'EXIT' ? Boolean(result?.alertTriggered) : false;
+      await handleTagEvent({
+        tagId,
+        zoneId: reader.zone || null,
+        eventType: reader.direction === 'EXIT' ? 'exit' : 'return'
+      }, { isViolation });
+
       results.push({ tagId, antennaPort, accepted: true, direction: reader.direction, movement: result.movement || 'RETURN' });
     }
 

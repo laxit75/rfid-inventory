@@ -4,6 +4,9 @@ const logger = require('../utils/logger');
 const EMAIL_QUEUE = 'email_alerts';
 const EMAIL_DLQ = 'email_alerts_dlq';
 const EMAIL_DLX = 'email_alerts_dlx';
+const SPEAKER_QUEUE = 'speaker_alerts';
+const SPEAKER_DLQ = 'speaker_alerts_dlq';
+const SPEAKER_DLX = 'speaker_alerts_dlx';
 const RETRY_INITIAL_MS = 1000;
 const RETRY_MAX_MS = 30000;
 
@@ -53,10 +56,19 @@ async function establishConnection() {
     deadLetterRoutingKey: EMAIL_DLQ
   });
 
+  await nextChannel.assertExchange(SPEAKER_DLX, 'direct', { durable: true });
+  await nextChannel.assertQueue(SPEAKER_DLQ, { durable: true });
+  await nextChannel.bindQueue(SPEAKER_DLQ, SPEAKER_DLX, SPEAKER_DLQ);
+  await nextChannel.assertQueue(SPEAKER_QUEUE, {
+    durable: true,
+    deadLetterExchange: SPEAKER_DLX,
+    deadLetterRoutingKey: SPEAKER_DLQ
+  });
+
   connection = nextConnection;
   channel = nextChannel;
   retryDelay = RETRY_INITIAL_MS;
-  logger.info('Connected to RabbitMQ', { queue: EMAIL_QUEUE });
+  logger.info('Connected to RabbitMQ', { queue: EMAIL_QUEUE, speakerQueue: SPEAKER_QUEUE });
   return channel;
 }
 
@@ -92,4 +104,29 @@ function publishEmailJob(job) {
     .catch((err) => logger.error('Failed to publish email job', { tagId: job.tagId, type: job.type, error: err.message }));
 }
 
-module.exports = { EMAIL_QUEUE, getChannel, publishEmailJob };
+function publishSpeakerJob(job) {
+  if (!job?.type || (!job?.tagId && !job?.deviceId)) {
+    logger.error('Speaker job was not published because it is invalid', { job });
+    return;
+  }
+
+  getChannel()
+    .then((activeChannel) => {
+      activeChannel.sendToQueue(SPEAKER_QUEUE, Buffer.from(JSON.stringify({
+        deviceId: job.deviceId || null,
+        tagId: job.tagId || null,
+        type: job.type
+      })), {
+        persistent: true,
+        contentType: 'application/json'
+      });
+    })
+    .catch((err) => logger.error('Failed to publish speaker job', {
+      deviceId: job.deviceId || null,
+      tagId: job.tagId || null,
+      type: job.type,
+      error: err.message
+    }));
+}
+
+module.exports = { EMAIL_QUEUE, SPEAKER_QUEUE, getChannel, publishEmailJob, publishSpeakerJob };
