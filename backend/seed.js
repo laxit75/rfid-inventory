@@ -81,9 +81,15 @@ async function seed() {
 
   await Tag.insertMany(tags);
 
-  // Create users
-  const adminHash = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD, 10);
-  const userHash = await bcrypt.hash(process.env.SEED_USER_PASSWORD, 10);
+  // Create users with fallback passwords if env vars not set
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || (process.env.NODE_ENV === 'production' ? '' : 'admin123');
+  const userPassword = process.env.SEED_USER_PASSWORD || (process.env.NODE_ENV === 'production' ? '' : 'user123');
+  if (process.env.NODE_ENV === 'production' && (!adminPassword || !userPassword)) {
+    console.error('SEED_ADMIN_PASSWORD and SEED_USER_PASSWORD must be set in production mode');
+    process.exit(1);
+  }
+  const adminHash = await bcrypt.hash(adminPassword, 10);
+  const userHash = await bcrypt.hash(userPassword, 10);
   await User.create([
     { username: 'admin', passwordHash: adminHash, role: 'ADMIN', active: true },
     { username: 'engineer1', passwordHash: userHash, role: 'USER', active: true }

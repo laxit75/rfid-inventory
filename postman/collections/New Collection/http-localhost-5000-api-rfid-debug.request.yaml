@@ -1,0 +1,10 @@
+$kind: http-request
+name: http://localhost:5000/api/rfid/debug
+url: http://localhost:5000/api/rfid/debug
+method: POST
+headers:
+  x-rfid-secret: 49a3ce58a9e441035ba73f1677dea7d1bb3178278bbd647aa0d3c668c791b88f
+body:
+  type: json
+  content: ""
+order: 1785147260963

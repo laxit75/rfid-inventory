@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import ConfirmDialog from './ConfirmDialog'
 
 export default function Recipients() {
   const [recipients, setRecipients] = useState([])
@@ -10,6 +11,7 @@ export default function Recipients() {
   const [formError, setFormError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [saving, setSaving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(null)
 
   const token = localStorage.getItem('token')
 
@@ -42,13 +44,18 @@ export default function Recipients() {
     }
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async () => {
+    if (!confirmDelete) return
+    setSaving(true)
     try {
-      await axios.delete(`/api/recipients/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+      await axios.delete(`/api/recipients/${confirmDelete}`, { headers: { Authorization: `Bearer ${token}` } })
       setFeedback('Recipient removed.')
+      setConfirmDelete(null)
       fetchRecipients()
     } catch (err) {
       setFormError(err.response?.data?.error || 'Unable to delete recipient.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -77,12 +84,24 @@ export default function Recipients() {
 
   return (
     <div className="page-shell">
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Remove recipient"
+        message={`Remove this recipient from the alert notification list? They will no longer receive RFID alert emails.`}
+        confirmLabel="Remove"
+        destructive
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(null)}
+        loading={saving}
+      />
+
       <div className="page-head">
         <div>
           <p className="eyebrow">Admin</p>
           <h2>Alert recipients</h2>
           <p className="page-subtitle">Manage email recipients for RFID alert escalation.</p>
         </div>
+        <span className="protected-badge">Password-protected</span>
       </div>
 
       <div className="content-card">
@@ -148,7 +167,7 @@ export default function Recipients() {
                         <td>
                           <div className="button-row">
                             <button className="button button-secondary" onClick={() => handleEditStart(r)}>Edit</button>
-                            <button className="button button-ghost" onClick={() => handleDelete(r._id)}>Delete</button>
+                            <button className="button button-ghost" onClick={() => setConfirmDelete(r._id)}>Delete</button>
                           </div>
                         </td>
                       </>

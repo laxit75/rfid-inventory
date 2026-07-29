@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import axios from 'axios'
-import { connectRealtime, disconnectRealtime } from '../realtime'
+import { connectRealtime } from '../realtime'
 import { Link, useNavigate } from 'react-router-dom'
 import PieChart from './PieChart'
 import TrendChart from './TrendChart'
 
-export default function Dashboard({ siteId }) {
+export default function Dashboard({ siteId, soundEnabled, onEnableSound }) {
   const navigate = useNavigate()
   const [tags, setTags] = useState([])
   const [settings, setSettings] = useState(null)
@@ -20,12 +20,7 @@ export default function Dashboard({ siteId }) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [tagFilter, setTagFilter] = useState('')
-  const [soundEnabled, setSoundEnabled] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return window.sessionStorage.getItem('rfid-sound-enabled') === 'true'
-  })
   const [soundNotice, setSoundNotice] = useState('')
-  const audioRef = useRef(null)
 
   const fetchTags = async (isInitial = false) => {
     try {
@@ -56,15 +51,6 @@ export default function Dashboard({ siteId }) {
       setSummary(res.data)
     } catch (err) {
       setSummary(null)
-    }
-  }
-
-  const fetchTrend = async () => {
-    try {
-      const res = await axios.get('/api/reports/trends?days=30', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
-      setTrendData(res.data.trend || [])
-    } catch (err) {
-      setTrendData([])
     }
   }
 
@@ -107,7 +93,7 @@ export default function Dashboard({ siteId }) {
     fetchTags(true)
     fetchSettings()
     fetchSummary()
-    // load default range (last 30 days)
+    // Load default range (last 30 days) - single source of truth for trend data
     fetchTrendRange(trendStart, trendEnd)
 
     // Realtime with polling fallback
@@ -160,68 +146,12 @@ export default function Dashboard({ siteId }) {
       try { sock.off('connect') } catch (e) {}
       try { sock.off('disconnect') } catch (e) {}
       try { sock.off('connect_error') } catch (e) {}
-      disconnectRealtime()
     }
   }, [siteId])
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.sessionStorage.setItem('rfid-sound-enabled', String(soundEnabled))
-    }
-  }, [soundEnabled])
-
-  useEffect(() => {
-    if (!settings) return
-
-    const alarmingTags = tags.filter(tag => tag.alertStatus === 'ALARMING' && !tag.silenced)
-    const shouldPlay = alarmingTags.length > 0 && !settings.alarmMuted && soundEnabled
-
-    if (!shouldPlay) {
-      audioRef.current?.pause()
-      audioRef.current && (audioRef.current.currentTime = 0)
-      return
-    }
-
-    const intervalMs = Math.max(1000, (settings.alarmRepeatIntervalSec || 5) * 1000)
-    const durationMs = Math.max(1000, (settings.alarmDurationSec || 5) * 1000)
-
-    const playBurst = async () => {
-      if (!audioRef.current) return
-      audioRef.current.pause()
-      audioRef.current.currentTime = 0
-      audioRef.current.volume = Math.min(1, Math.max(0, (settings.alarmVolume || 0) / 100))
-      try {
-        await audioRef.current.play()
-      } catch (err) {
-        setSoundNotice('Audio playback is blocked until you interact with the page.')
-      }
-    }
-
-    playBurst()
-    const timeoutId = window.setTimeout(() => {
-      audioRef.current?.pause()
-      audioRef.current && (audioRef.current.currentTime = 0)
-    }, durationMs)
-    const intervalId = window.setInterval(() => {
-      playBurst()
-    }, intervalMs)
-
-    return () => {
-      window.clearTimeout(timeoutId)
-      window.clearInterval(intervalId)
-      audioRef.current?.pause()
-      audioRef.current && (audioRef.current.currentTime = 0)
-    }
-  }, [tags, settings, soundEnabled])
-
   const enableSound = async () => {
     try {
-      if (!audioRef.current) return
-      audioRef.current.volume = 0.0001
-      await audioRef.current.play()
-      audioRef.current.pause()
-      audioRef.current.currentTime = 0
-      setSoundEnabled(true)
+      await onEnableSound?.()
       setSoundNotice('Alarm sound enabled.')
     } catch (err) {
       setSoundNotice('Audio is blocked until you click the page again.')
@@ -236,19 +166,6 @@ export default function Dashboard({ siteId }) {
   const violationsToday = summary?.violationsToday ?? 0
   const violationsWeek = summary?.violationsWeek ?? 0
   const avgResolutionMs = summary?.avgResolutionMs ?? null
-
-  const formatDuration = (ms) => {
-    if (ms === null) return 'N/A'
-    const seconds = Math.round(ms / 1000)
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}m ${secs}s`
-  }
-
-  const trendBounds = useMemo(() => {
-    if (!trendData || trendData.length === 0) return { max: 1 }
-    return { max: Math.max(...trendData.map(item => item.total), 1) }
-  }, [trendData])
 
   const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   const focusMetric = (metric) => {
@@ -266,16 +183,42 @@ export default function Dashboard({ siteId }) {
       setTagFilter(metric); scrollTo('tag-list')
     }
   }
+  const exportCsv = () => {
+    const headers = ['Tag ID', 'Equipment', 'Status', 'Assigned Zone', 'Current Zone', 'Alert Status']
+    const rows = visibleTags.map(tag => [
+      tag.tagId,
+      tag.equipment?.name || 'N/A',
+      tag.status,
+      tag.assignedZone?.name || 'Unassigned',
+      tag.currentZone?.name || 'Outside all zones',
+      tag.alertStatus
+    ])
+    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `rfid-dashboard-${new Date().toISOString().slice(0,10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
   const visibleTags = tags.filter(tag => tagFilter === 'outside' ? !tag.currentZone : tagFilter === 'alarming' ? tag.alertStatus === 'ALARMING' : tagFilter === 'overdue' ? tag.alertStatus === 'OVERDUE' : true)
 
   return (
     <div className="page-shell">
-      <audio ref={audioRef} src="/sounds/alarm.wav" preload="auto" />
       <div className="page-head">
         <div>
           <p className="eyebrow">Live operations</p>
           <h2>Lab dashboard</h2>
           <p className="page-subtitle">Monitor tag movement, alarming equipment, and overdue exits in one place.</p>
+        </div>
+        <div className="button-row">
+          <button className="button button-ghost" onClick={exportCsv} title="Download visible tags as CSV">
+            📥 Export CSV
+          </button>
         </div>
       </div>
 

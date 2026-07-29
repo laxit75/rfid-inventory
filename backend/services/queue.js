@@ -78,11 +78,10 @@ function getChannel() {
     connecting = establishConnection()
       .catch((err) => {
         logger.error('RabbitMQ connection failed', { error: err.message });
+        // Reset connecting flag so the next call retries fresh
+        connecting = null;
         scheduleReconnect();
         throw err;
-      })
-      .finally(() => {
-        connecting = null;
       });
   }
   return connecting;

@@ -2,14 +2,17 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { startScheduler, stopScheduler } = require('./services/scheduler');
 const { startEmailWorker, stopEmailWorker } = require('./workers/emailWorker');
 const { startSpeakerWorker, stopSpeakerWorker } = require('./workers/speakerWorker');
 const { startChangeStream, stopChangeStream } = require('./services/changeStream');
+const { startServer: startMarktraceServer, stopServer: stopMarktraceServer } = require('./services/marktraceTcpServer');
 const Zone = require('./models/Zone');
 const logger = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
+const morgan = require('morgan');
 
 const defaultZones = [
   { name: 'Zone A - Test Bay', description: 'Primary test bay' },
@@ -30,11 +33,26 @@ const app = express();
 const http = require('http');
 const { setIo } = require('./services/realtime');
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',').map((item) => item.trim()).filter(Boolean);
+
+// Security headers via helmet
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
+
 app.use(cors({
   origin: allowedOrigins,
   credentials: true
 }));
 app.use(express.json({ verify: (req, res, buffer) => { req.rawBody = buffer.toString('utf8'); } }));
+
+// HTTP request logging with morgan (pattern from sw attendance project)
+const morganLogFormat = process.env.NODE_ENV === 'production'
+  ? ':method :url :status :res[content-length] - :response-time ms'
+  : 'dev';
+app.use('/api', morgan(morganLogFormat, {
+  stream: { write: (msg) => logger.info(msg.trim()) }
+}));
 
 const loginRateLimitWindowMs = process.env.LOGIN_LIMIT_WINDOW_MS ? Number(process.env.LOGIN_LIMIT_WINDOW_MS) : 15 * 60 * 1000;
 const loginRateLimitMax = process.env.LOGIN_LIMIT_MAX ? Number(process.env.LOGIN_LIMIT_MAX) : 10;
@@ -47,6 +65,25 @@ const loginLimiter = rateLimit({
   message: { error: 'Too many login attempts. Please try again later.' }
 });
 
+// General API rate limiter (100 requests per minute per IP)
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please slow down.' }
+});
+app.use('/api', apiLimiter);
+
+// Stricter rate limit for admin operations
+const adminLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many admin requests. Please slow down.' }
+});
+
 // Routes
 app.use('/api/health', require('./routes/health'));
 app.use('/api/auth/login', loginLimiter);
@@ -55,14 +92,18 @@ app.use('/api/tags', require('./routes/tags'));
 app.use('/api/equipment', require('./routes/equipment'));
 app.use('/api', require('./routes/movement'));
 app.use('/api/rfid', require('./routes/rfidIngest'));
-app.use('/api/settings', require('./routes/settings'));
+app.use('/api/settings', adminLimiter, require('./routes/settings'));
 app.use('/api/reports', require('./routes/reports'));
-app.use('/api/recipients', require('./routes/recipients'));
-app.use('/api/users', require('./routes/users'));
+app.use('/api/recipients', adminLimiter, require('./routes/recipients'));
+app.use('/api/users', adminLimiter, require('./routes/users'));
 app.use('/api/audit', require('./routes/audit'));
 app.use('/api/zones', require('./routes/zones'));
 app.use('/api/readers', require('./routes/readers'));
-app.use('/api/devices', require('./routes/devices'));
+app.use('/api/devices', adminLimiter, require('./routes/devices'));
+app.use('/api/device-groups', adminLimiter, require('./routes/deviceGroups'));
+app.use('/api/alert-target-groups', adminLimiter, require('./routes/alertTargetGroups'));
+app.use('/api/alert-flows', adminLimiter, require('./routes/alertFlows'));
+app.use('/api/tag-assignments', adminLimiter, require('./routes/tagAssignments'));
 app.use(errorHandler);
 
 let server;
@@ -87,12 +128,14 @@ function connectWithRetry() {
             try { startScheduler(); } catch (e) {}
             try { await startEmailWorker(); } catch (e) {}
             try { await startSpeakerWorker(); } catch (e) {}
+            try { startMarktraceServer(); } catch (e) { logger.warn('Marktrace TCP server unavailable', { error: e.message }); }
           },
           onRelease: async () => {
             try { stopChangeStream(); } catch (e) {}
             try { stopScheduler(); } catch (e) {}
             try { await stopEmailWorker(); } catch (e) {}
             try { await stopSpeakerWorker(); } catch (e) {}
+            try { stopMarktraceServer(); } catch (e) {}
           }
         });
       const PORT = process.env.PORT || 5000;
@@ -138,6 +181,14 @@ connectWithRetry();
 
 async function shutdown(signal) {
   logger.info('Shutting down gracefully', { signal });
+
+  // Force shutdown after 15 seconds
+  const forceExit = setTimeout(() => {
+    logger.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 15000);
+  forceExit.unref();
+
   try {
     const leader = require('./services/leader');
     await leader.stop();
@@ -145,17 +196,24 @@ async function shutdown(signal) {
 
   if (server) {
     server.close(() => {
+      clearTimeout(forceExit);
       logger.info('HTTP server closed');
-      process.exit(0);
+      mongoose.connection.close(false).then(() => {
+        logger.info('MongoDB connection closed');
+        process.exit(0);
+      }).catch(() => process.exit(0));
     });
   } else {
+    clearTimeout(forceExit);
     process.exit(0);
   }
 }
 
+// Handle SIGUSR2 for nodemon compatibility
 process.once('SIGUSR2', () => {
-  shutdown('SIGUSR2');
-  process.kill(process.pid, 'SIGUSR2');
+  shutdown('SIGUSR2').then(() => {
+    process.kill(process.pid, 'SIGUSR2');
+  });
 });
 
 process.on('SIGINT', () => shutdown('SIGINT'));
@@ -178,3 +236,7 @@ require('./models/Recipient');
 require('./models/Settings');
 require('./models/Zone');
 require('./models/Device');
+require('./models/DeviceGroup');
+require('./models/AlertTargetGroup');
+require('./models/AlertFlow');
+require('./models/TagAssignment');

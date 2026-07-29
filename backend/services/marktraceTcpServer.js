@@ -87,10 +87,7 @@ function handleData(socket, data) {
 // Create a server that accepts incoming connections from the reader (reader dials out)
 const server = net.createServer((socket) => {
   const clientAddr = `${socket.remoteAddress}:${socket.remotePort}`;
-  // Distinct, immediate connection log so it's easy to spot connection events
   logger.info(`Client connected from ${clientAddr}`);
-  // Also emit a concise console line for terminals that don't surface structured logs
-  console.log(`Client connected from ${clientAddr}`);
 
   logger.info('Marktrace reader connected', { remoteAddress: socket.remoteAddress, remotePort: socket.remotePort });
   activeSockets.add(socket);
@@ -117,7 +114,6 @@ function startServer(port = DEFAULT_LISTEN_PORT, host = DEFAULT_LISTEN_HOST) {
   server.listen(listenPort, listenHost, () => {
     const address = `${listenHost}:${listenPort}`;
     logger.info('Marktrace TCP server listening', { listenAddress: address });
-    console.log(`Marktrace TCP server listening on ${address}`);
     logger.info('Reader must dial this public address over cellular; ensure cloud host/public IP and security group port are configured');
   });
 
@@ -148,19 +144,9 @@ async function stopServer() {
   });
 }
 
-function handleShutdown(signal) {
-  logger.info('Shutdown signal received', { signal });
-  stopServer().then(() => {
-    logger.info('Graceful shutdown complete');
-    process.exit(0);
-  }).catch((err) => {
-    logger.error('Error during graceful shutdown', { error: err && err.message });
-    process.exit(1);
-  });
-}
-
-process.on('SIGINT', () => handleShutdown('SIGINT'));
-process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+// NOTE: Shutdown signal handling is managed by server.js.
+// Do NOT register duplicate process.on('SIGINT'/'SIGTERM') handlers here.
+// This module exports the raw server so server.js can manage its lifecycle.
 
 // Exported API: startServer, stopServer, parseTagFrame placeholder, and an EventEmitter
 module.exports = {

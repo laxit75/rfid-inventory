@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import ConfirmDialog from './ConfirmDialog'
 
 export default function Users() {
   const [users, setUsers] = useState([])
@@ -9,6 +10,7 @@ export default function Users() {
   const [formError, setFormError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [saving, setSaving] = useState(false)
+  const [confirmToggle, setConfirmToggle] = useState(null)
 
   const token = localStorage.getItem('token')
 
@@ -53,24 +55,66 @@ export default function Users() {
     }
   }
 
-  const handleToggleActive = async (id, currentActive) => {
+  const handleToggleActive = async () => {
+    if (!confirmToggle) return
+    const { id, toActive } = confirmToggle
+    setSaving(true)
     try {
-      await axios.patch(`/api/users/${id}`, { active: !currentActive }, { headers: { Authorization: `Bearer ${token}` } })
-      setFeedback('User status updated.')
+      await axios.patch(`/api/users/${id}`, { active: toActive }, { headers: { Authorization: `Bearer ${token}` } })
+      setConfirmToggle(null)
+      setFeedback(`User ${toActive ? 'activated' : 'deactivated'} successfully.`)
       fetchUsers()
     } catch (err) {
       setFormError(err.response?.data?.error || 'Unable to change user status.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const requestToggle = (id, currentActive) => {
+    const targetActive = !currentActive
+    if (targetActive) {
+      // Activating is not destructive, do it immediately
+      handleToggleActiveImmediate(id, targetActive)
+    } else {
+      // Deactivation is destructive, show confirmation
+      setConfirmToggle({ id, toActive: false })
+    }
+  }
+
+  const handleToggleActiveImmediate = async (id, toActive) => {
+    setSaving(true)
+    try {
+      await axios.patch(`/api/users/${id}`, { active: toActive }, { headers: { Authorization: `Bearer ${token}` } })
+      setFeedback('User activated successfully.')
+      fetchUsers()
+    } catch (err) {
+      setFormError(err.response?.data?.error || 'Unable to change user status.')
+    } finally {
+      setSaving(false)
     }
   }
 
   return (
     <div className="page-shell">
+      <ConfirmDialog
+        open={!!confirmToggle}
+        title="Deactivate user"
+        message="This will revoke this user's access to the RFID system. They will not be able to log in until an administrator reactivates them."
+        confirmLabel="Deactivate"
+        destructive
+        onConfirm={handleToggleActive}
+        onCancel={() => setConfirmToggle(null)}
+        loading={saving}
+      />
+
       <div className="page-head">
         <div>
           <p className="eyebrow">Admin</p>
           <h2>User management</h2>
           <p className="page-subtitle">Create and manage operator access to the lab system.</p>
         </div>
+        <span className="protected-badge">Password-protected</span>
       </div>
 
       <div className="content-card">
@@ -137,7 +181,7 @@ export default function Users() {
                     <td>{u.role}{u.zones && u.zones.length > 0 ? ` (${u.zones.map(z=>z.name).join(', ')})` : ''}</td>
                     <td>{u.active ? 'Yes' : 'No'}</td>
                     <td>
-                      <button className="button button-secondary" onClick={() => handleToggleActive(u._id, u.active)}>
+                      <button className={`button ${u.active ? 'button-ghost' : 'button-secondary'}`} onClick={() => requestToggle(u._id, u.active)} disabled={saving}>
                         {u.active ? 'Deactivate' : 'Activate'}
                       </button>
                     </td>

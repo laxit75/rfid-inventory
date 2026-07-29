@@ -1,0 +1,14 @@
+$kind: http-request
+name: http://localhost:5000/api/rfid/ingest
+url: http://localhost:5000/api/rfid/ingest
+method: POST
+headers:
+  x-rfid-secret: 49a3ce58a9e441035ba73f1677dea7d1bb3178278bbd647aa0d3c668c791b88f
+body:
+  type: json
+  content: |-
+    {
+      "tagId": "TEST123",
+      "antennaPort": 1
+    }
+order: 3549659333298513

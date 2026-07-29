@@ -1,31 +1,47 @@
 services:
+  frontend:
+    build: ../frontend
+    ports: ["80:80"]
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:5000}
+    depends_on: [backend]
+    restart: unless-stopped
+
   backend:
     build: .
     environment:
       PORT: 5000
       MONGODB_URI: mongodb://mongo:27017/rfid-inventory
       RABBITMQ_URL: amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASS:-guest}@rabbitmq:5672
-      JWT_SECRET: ${JWT_SECRET}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      RFID_WEBHOOK_SECRET: ${RFID_WEBHOOK_SECRET:-change-me-in-production}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM: ${SMTP_FROM:-RFID System <no-reply@rfid.local>}
+      SMTP_FROM: "${SMTP_FROM:-RFID System <no-reply@rfid.local>}"
+      RFID_WEBHOOK_SECRET: ${RFID_WEBHOOK_SECRET:-change-me-in-production}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+      NODE_ENV: ${NODE_ENV:-production}
+      MARKTRACE_LISTEN_HOST: ${MARKTRACE_LISTEN_HOST:-0.0.0.0}
+      MARKTRACE_LISTEN_PORT: ${MARKTRACE_LISTEN_PORT:-4600}
     ports: ["5000:5000"]
     depends_on: [rabbitmq, mongo]
+    restart: unless-stopped
 
   mongo:
     image: mongo:7
     volumes: ["mongo_data:/data/db"]
+    restart: unless-stopped
 
   rabbitmq:
     image: rabbitmq:3-management
     ports: ["5672:5672", "15672:15672"]
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
     volumes: ["rabbitmq_data:/var/lib/rabbitmq"]
+    restart: unless-stopped
 
 volumes:
   mongo_data:

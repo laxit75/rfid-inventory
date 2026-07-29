@@ -14,6 +14,53 @@ export default function TagManagement() {
   const [newZone, setNewZone] = useState('')
   const [newStatus, setNewStatus] = useState('ACTIVE')
   const [newError, setNewError] = useState('')
+  const [selectedIds, setSelectedIds] = useState([])
+  const [bulkAction, setBulkAction] = useState('')
+  const [bulkBusy, setBulkBusy] = useState(false)
+
+  // Keyboard shortcut: Ctrl+A to select all, Escape to deselect all
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        e.preventDefault()
+        if (tags.length > 0) setSelectedIds(tags.map(t => t._id))
+      }
+      if (e.key === 'Escape') setSelectedIds([])
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [tags])
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  const selectAll = () => {
+    if (selectedIds.length === tags.length) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(tags.map(t => t._id))
+    }
+  }
+
+  const handleBulkAction = async () => {
+    if (selectedIds.length === 0 || !bulkAction) return
+    setBulkBusy(true)
+    try {
+      const token = localStorage.getItem('token')
+      await Promise.all(selectedIds.map(id =>
+        axios.patch(`/api/tags/${id}`, { status: bulkAction }, { headers: { Authorization: `Bearer ${token}` } })
+      ))
+      setSelectedIds([])
+      setBulkAction('')
+      fetchTags(false)
+    } catch (err) {
+      console.error('Bulk action failed', err)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
 
   const fetchTags = async (isInitial = false) => {
     try {
@@ -113,8 +160,8 @@ export default function TagManagement() {
       <div className="content-card">
         <div className="card-header">
           <div>
-            <h3>Tag management</h3>
-            <p className="card-copy">Adjust tag state and resolve active alarms without changing backend behavior.</p>
+            <h3>All tags</h3>
+            <p className="card-copy">Adjust tag state, silence alarms, and manage assignments.</p>
           </div>
           <button className="button button-primary" onClick={() => setShowAdd(prev => !prev)}>
             {showAdd ? 'Cancel' : 'Add Tag'}
@@ -167,10 +214,28 @@ export default function TagManagement() {
         ) : tags.length === 0 ? (
           <div className="empty-state">No tags are available to manage.</div>
         ) : (
-          <div className="table-wrapper">
+          <>
+            {/* Bulk actions toolbar */}
+            {selectedIds.length > 0 && (
+              <div className="bulk-bar">
+                <span className="bulk-bar__count">{selectedIds.length} tag{selectedIds.length !== 1 ? 's' : ''} selected</span>
+                <select value={bulkAction} onChange={e => setBulkAction(e.target.value)} className="bulk-bar__select">
+                  <option value="">Bulk action…</option>
+                  <option value="ACTIVE">Set Active</option>
+                  <option value="TEMP_DISABLED">Temp Disable</option>
+                  <option value="PERMANENT_DISABLED">Perm Disable</option>
+                </select>
+                <button className="button" onClick={handleBulkAction} disabled={!bulkAction || bulkBusy}>
+                  {bulkBusy ? 'Applying…' : 'Apply'}
+                </button>
+                <button className="button button-ghost" onClick={() => setSelectedIds([])}>Clear</button>
+              </div>
+            )}
+            <div className="table-wrapper">
             <table className="data-table">
               <thead>
                 <tr>
+                  <th><input type="checkbox" onChange={selectAll} checked={selectedIds.length === tags.length && tags.length > 0} aria-label="Select all" /></th>
                   <th>Tag ID</th>
                   <th>Equipment</th>
                   <th>Status</th>
@@ -182,7 +247,8 @@ export default function TagManagement() {
               </thead>
               <tbody>
                 {tags.map(tag => (
-                  <tr key={tag._id}>
+                  <tr key={tag._id} className={selectedIds.includes(tag._id) ? 'tag-row--selected' : ''}>
+                    <td><input type="checkbox" checked={selectedIds.includes(tag._id)} onChange={() => toggleSelect(tag._id)} aria-label={`Select ${tag.tagId}`} /></td>
                     <td>{tag.tagId}</td>
                     <td>{tag.equipment?.name}</td>
                     <td>
@@ -256,6 +322,7 @@ export default function TagManagement() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     </div>

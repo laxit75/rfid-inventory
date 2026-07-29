@@ -4,7 +4,23 @@ const realtime = require('./realtime');
 const logger = require('../utils/logger');
 
 let changeStream = null;
+
+/**
+ * Bounded deduplication cache for change stream events.
+ * Uses a Map with an LRU-like eviction when cache exceeds MAX_ENTRIES.
+ * This prevents unbounded memory growth when the change stream is long-lived.
+ */
+const MAX_DEDUPE_ENTRIES = 1000;
 const lastSeen = new Map();
+
+function trackChange(docId, changeId) {
+  // Evict oldest entry if at capacity
+  if (lastSeen.size >= MAX_DEDUPE_ENTRIES) {
+    const oldestKey = lastSeen.keys().next().value;
+    if (oldestKey) lastSeen.delete(oldestKey);
+  }
+  lastSeen.set(docId, changeId);
+}
 
 async function startChangeStream() {
   if (changeStream) return;
@@ -20,10 +36,10 @@ async function startChangeStream() {
         const docId = change.documentKey && change.documentKey._id ? String(change.documentKey._id) : null;
         if (!docId) return;
 
-        // Simple dedupe: skip if we've already seen this change id for the doc
+        // Dedupe: skip if we've already seen this change id for the doc
         const existing = lastSeen.get(docId);
         if (existing === changeId) return;
-        lastSeen.set(docId, changeId);
+        trackChange(docId, changeId);
 
         // fullDocument will be present because of updateLookup
         const full = change.fullDocument || await Tag.findById(docId).populate(['equipment','assignedZone','currentZone']);
@@ -39,6 +55,8 @@ async function startChangeStream() {
     });
     changeStream.on('error', (err) => {
       logger.warn('Change stream error', { error: err.message });
+      // Clear dedupe cache on error to prevent stale entries from blocking events
+      lastSeen.clear();
       // Close and cleanup so startChangeStream can retry later
       try { changeStream.close(); } catch (e) {}
       changeStream = null;
@@ -57,6 +75,7 @@ async function stopChangeStream() {
   } catch (err) {
     // ignore
   }
+  lastSeen.clear();
   changeStream = null;
 }
 
