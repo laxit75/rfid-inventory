@@ -1,0 +1,26 @@
+<html>
+  <body style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+    <h2>{{digestType}} Alert Digest</h2>
+    <p><strong>{{summary}}</strong></p>
+    <p>Generated at: {{timestamp}}</p>
+
+    <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
+      <thead>
+        <tr style="background: #f1f5f9; text-align: left;">
+          <th style="padding: 8px 12px; border-bottom: 2px solid #e2e8f0;">Tag ID</th>
+          <th style="padding: 8px 12px; border-bottom: 2px solid #e2e8f0;">Status</th>
+          <th style="padding: 8px 12px; border-bottom: 2px solid #e2e8f0;">Since</th>
+          <th style="padding: 8px 12px; border-bottom: 2px solid #e2e8f0;">Alarm Count</th>
+          <th style="padding: 8px 12px; border-bottom: 2px solid #e2e8f0;">Location</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{alertRows}}
+      </tbody>
+    </table>
+
+    <p style="margin-top: 20px; font-size: 12px; color: #94a3b8;">
+      RFID Inventory System — Automated notification
+    </p>
+  </body>
+</html>

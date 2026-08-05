@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import axios from 'axios'
 import ConfirmDialog from './ConfirmDialog'
 import { useToast } from '../hooks/useToast'
@@ -7,6 +7,22 @@ const emptyForm = { name: '', description: '', recipients: [], tagAssignments: [
 
 // Empty form for creating a new tag-to-person assignment inline
 const emptyTagAssignment = { tagId: '', personName: '', personEmail: '', notes: '' }
+
+// Helper: build a lookup map from tagAssignmentId -> full object for quick display
+function buildAssignmentLookup(groups, localCache) {
+  const map = new Map();
+  // Populate from existing groups
+  for (const g of groups) {
+    for (const ta of (g.tagAssignments || [])) {
+      if (ta && ta._id) map.set(ta._id, ta);
+    }
+  }
+  // Overlay with locally-created assignments (more recent)
+  for (const ta of localCache) {
+    if (ta && ta._id) map.set(ta._id, ta);
+  }
+  return map;
+}
 
 export default function AlertTargetGroups() {
   const [groups, setGroups] = useState([])
@@ -20,6 +36,8 @@ export default function AlertTargetGroups() {
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [newTagAssign, setNewTagAssign] = useState(emptyTagAssignment)
   const [tagAssignError, setTagAssignError] = useState('')
+  // Local cache of tag assignments created during this form session (not yet saved to a group)
+  const [localTagAssignments, setLocalTagAssignments] = useState([])
   const { toast, Toaster } = useToast()
 
   const token = localStorage.getItem('token')
@@ -42,6 +60,9 @@ export default function AlertTargetGroups() {
     }
   }
 
+  // Build the lookup map used throughout the render (memoized)
+  const assignmentLookup = useMemo(() => buildAssignmentLookup(groups, localTagAssignments), [groups, localTagAssignments])
+
   useEffect(() => { loadAll() }, [])
 
   const startEdit = (group) => {
@@ -52,6 +73,8 @@ export default function AlertTargetGroups() {
       recipients: group.recipients?.map(r => r._id || r) || [],
       tagAssignments: group.tagAssignments?.map(ta => ta._id || ta) || []
     })
+    // Pre-populate local cache with existing assignments so they display correctly
+    setLocalTagAssignments(group.tagAssignments?.filter(ta => ta && ta._id) || [])
     setShowForm(true)
   }
 
@@ -61,19 +84,35 @@ export default function AlertTargetGroups() {
       setTagAssignError('Tag, person name, and email are required.')
       return
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newTagAssign.personEmail)) {
+      setTagAssignError('Please enter a valid email address.')
+      return
+    }
+    // Warn if this tag is already assigned to someone in this group
+    const isDuplicate = form.tagAssignments.some(id => {
+      const existing = assignmentLookup.get(id)
+      return existing?.tagId?._id === newTagAssign.tagId || existing?.tagId === newTagAssign.tagId
+    })
+    if (isDuplicate) {
+      setTagAssignError('This tag is already assigned to someone in this group. Remove the existing assignment first or use a different tag.')
+      return
+    }
     setTagAssignError('')
     setSaving(true)
     try {
       const res = await axios.post('/api/tag-assignments', newTagAssign, {
         headers: { Authorization: `Bearer ${token}` }
       })
+      const created = res.data
       // Add the new assignment ID to the form
       setForm(prev => ({
         ...prev,
-        tagAssignments: [...prev.tagAssignments, res.data._id]
+        tagAssignments: [...prev.tagAssignments, created._id]
       }))
+      // Cache the full object locally so we can display it immediately
+      setLocalTagAssignments(prev => [...prev, created])
       setNewTagAssign(emptyTagAssignment)
-      toast({ title: 'Tag assignment added', description: `${res.data.personName} assigned to tag.`, variant: 'success' })
+      toast({ title: 'Tag assignment added', description: `${created.personName} assigned to tag.`, variant: 'success' })
     } catch (err) {
       toast({ title: 'Failed to add', description: err.response?.data?.error || 'Unable to add tag assignment.', variant: 'error' })
     } finally {
@@ -92,6 +131,7 @@ export default function AlertTargetGroups() {
         ...prev,
         tagAssignments: prev.tagAssignments.filter(id => id !== assignmentId)
       }))
+      setLocalTagAssignments(prev => prev.filter(ta => ta._id !== assignmentId))
       toast({ title: 'Assignment removed', variant: 'info' })
     } catch (err) {
       toast({ title: 'Failed to remove', variant: 'error' })
@@ -117,6 +157,7 @@ export default function AlertTargetGroups() {
       }
       setForm(emptyForm)
       setEditingId(null)
+      setLocalTagAssignments([])
       setShowForm(false)
       loadAll()
     } catch (err) {
@@ -170,7 +211,7 @@ export default function AlertTargetGroups() {
           <h2>Alert target groups</h2>
           <p className="page-subtitle">Group email recipients together so alert flows can notify the right people.</p>
         </div>
-        <button className="button" onClick={() => { setShowForm(!showForm); setEditingId(null); setForm(emptyForm) }}>
+        <button className="button" onClick={() => { setShowForm(!showForm); setEditingId(null); setForm(emptyForm); setLocalTagAssignments([]); setNewTagAssign(emptyTagAssignment); setTagAssignError('') }}>
           {showForm ? 'Cancel' : 'New group'}
         </button>
       </div>
@@ -233,7 +274,24 @@ export default function AlertTargetGroups() {
                   <span>Email</span>
                   <input type="email" placeholder="john@company.com" value={newTagAssign.personEmail} onChange={e => setNewTagAssign({ ...newTagAssign, personEmail: e.target.value })} />
                 </div>
-                <button className="button button-secondary" type="button" onClick={addTagAssignment} disabled={saving} style={{ whiteSpace: 'nowrap', padding: '0.7rem 0.8rem', fontSize: '0.82rem' }}>
+                <button
+                  type="button"
+                  onClick={addTagAssignment}
+                  disabled={saving || !newTagAssign.tagId || !newTagAssign.personName || !newTagAssign.personEmail}
+                  style={{
+                    whiteSpace: 'nowrap',
+                    padding: '0.7rem 1rem',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                    background: '#0891b2',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 8,
+                    cursor: saving ? 'not-allowed' : 'pointer',
+                    opacity: saving || !newTagAssign.tagId || !newTagAssign.personName || !newTagAssign.personEmail ? 0.5 : 1,
+                    transition: 'opacity 0.15s, background 0.15s'
+                  }}
+                >
                   {saving ? '…' : 'Add'}
                 </button>
               </div>
@@ -243,10 +301,7 @@ export default function AlertTargetGroups() {
               {form.tagAssignments.length > 0 && (
                 <div className="multi-select-list" style={{ maxHeight: 150 }}>
                   {form.tagAssignments.map(id => {
-                    // Find the assignment details from groups data
-                    const fullAssignment = groups
-                      .flatMap(g => g.tagAssignments || [])
-                      .find(ta => ta._id === id)
+                    const fullAssignment = assignmentLookup.get(id)
                     return (
                       <div key={id} className="multi-select-item" style={{ justifyContent: 'space-between' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
@@ -271,7 +326,7 @@ export default function AlertTargetGroups() {
               <button className="button" type="submit" disabled={saving}>
                 {saving ? 'Saving…' : editingId ? 'Save group' : 'Create group'}
               </button>
-              <button className="button button-ghost" type="button" onClick={() => { setShowForm(false); setForm(emptyForm); setEditingId(null); setNewTagAssign(emptyTagAssignment); setTagAssignError('') }}>Cancel</button>
+              <button className="button button-ghost" type="button" onClick={() => { setShowForm(false); setForm(emptyForm); setEditingId(null); setNewTagAssign(emptyTagAssignment); setTagAssignError(''); setLocalTagAssignments([]) }}>Cancel</button>
             </div>
           </form>
         </div>

@@ -19,17 +19,18 @@ import Devices from './components/Devices'
 import DeviceGroups from './components/DeviceGroups'
 import AlertTargetGroups from './components/AlertTargetGroups'
 import AlertFlows from './components/AlertFlows'
+import AlertDashboard from './components/AlertDashboard'
 import SummaryReport from './components/SummaryReport'
 import FullReport from './components/FullReport'
 import ManageRoles from './components/ManageRoles'
 import ManageSites from './components/ManageSites'
 import ReportBuilder from './components/ReportBuilder'
 
+
 function App() {
   const location = useLocation()
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(null);
-  const [testingMode, setTestingMode] = useState(false);
   const [siteId, setSiteId] = useState(() => {
     const savedSite = localStorage.getItem('rfid-active-site')
     return savedSite === 'all-sites' || /^[a-f\d]{24}$/i.test(savedSite || '') ? savedSite : 'all-sites'
@@ -294,25 +295,50 @@ function App() {
       {sessionExpiring && (
         <div className="session-timeout-banner">
           <span>Your session will expire soon due to inactivity.</span>
-          <button className="button button-secondary" onClick={() => resetInactivityTimer()}>
+          <button
+            onClick={() => resetInactivityTimer()}
+            style={{
+              background: 'white',
+              color: '#0a0a0a',
+              border: 'none',
+              borderRadius: 8,
+              padding: '0.4rem 0.9rem',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+            }}
+          >
             Stay logged in
           </button>
-          <button className="button button-ghost" style={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }} onClick={handleLogout}>
+          <button
+            onClick={handleLogout}
+            style={{
+              background: 'transparent',
+              color: 'rgba(255,255,255,0.75)',
+              border: '1px solid rgba(255,255,255,0.3)',
+              borderRadius: 8,
+              padding: '0.4rem 0.9rem',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+            }}
+          >
             Logout now
           </button>
         </div>
       )}
       <audio ref={alarmAudioRef} src="/sounds/alarm.wav" preload="auto" />
-      <Layout user={user} onLogout={handleLogout} testingMode={testingMode} onTestingModeChange={setTestingMode} siteId={siteId} onSiteChange={setSiteId}>
+      <Layout user={user} onLogout={handleLogout} siteId={siteId} onSiteChange={setSiteId}>
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
             <Route path="/" element={<ErrorBoundary key="dashboard"><AnimatedPage><Dashboard siteId={siteId} soundEnabled={soundEnabled} onEnableSound={enableAlarmSound} /></AnimatedPage></ErrorBoundary>} />
-            <Route path="/simulator" element={user?.role === 'ADMIN' && testingMode ? <ErrorBoundary key="sim"><AnimatedPage><Simulator /></AnimatedPage></ErrorBoundary> : <Navigate to="/" />} />
+            <Route path="/simulator" element={user?.role === 'ADMIN' ? <ErrorBoundary key="sim"><AnimatedPage><Simulator /></AnimatedPage></ErrorBoundary> : <Navigate to="/" />} />
             <Route path="/tags" element={<ErrorBoundary key="tags"><AnimatedPage><TagManagement /></AnimatedPage></ErrorBoundary>} />
             <Route path="/devices" element={user?.role === 'ADMIN' ? <ErrorBoundary key="devices"><AnimatedPage><Devices /></AnimatedPage></ErrorBoundary> : <Navigate to="/" />} />
           <Route path="/device-groups" element={user?.role === 'ADMIN' ? <ErrorBoundary key="device-groups"><AnimatedPage><DeviceGroups /></AnimatedPage></ErrorBoundary> : <Navigate to="/" />} />
           <Route path="/alert-target-groups" element={user?.role === 'ADMIN' ? <ErrorBoundary key="alert-target-groups"><AnimatedPage><AlertTargetGroups /></AnimatedPage></ErrorBoundary> : <Navigate to="/" />} />
           <Route path="/alert-flows" element={user?.role === 'ADMIN' ? <ErrorBoundary key="alert-flows"><AnimatedPage><AlertFlows /></AnimatedPage></ErrorBoundary> : <Navigate to="/" />} />
+            <Route path="/alerts" element={<ErrorBoundary key="alerts"><AnimatedPage><AlertDashboard /></AnimatedPage></ErrorBoundary>} />
             <Route path="/summary-report" element={<ErrorBoundary key="summary"><AnimatedPage><SummaryReport siteId={siteId} /></AnimatedPage></ErrorBoundary>} />
             <Route path="/full-report" element={<ErrorBoundary key="full"><AnimatedPage><FullReport siteId={siteId} /></AnimatedPage></ErrorBoundary>} />
             <Route path="/report-builder" element={user?.role === 'ADMIN' ? <ErrorBoundary key="report-builder"><AnimatedPage><ReportBuilder /></AnimatedPage></ErrorBoundary> : <Navigate to="/" />} />
@@ -323,6 +349,7 @@ function App() {
             <Route path="/recipients" element={user?.role === 'ADMIN' ? <ErrorBoundary key="recipients"><AnimatedPage><Recipients /></AnimatedPage></ErrorBoundary> : <Navigate to="/" />} />
             <Route path="/users" element={user?.role === 'ADMIN' ? <ErrorBoundary key="users"><AnimatedPage><Users /></AnimatedPage></ErrorBoundary> : <Navigate to="/" />} />
             <Route path="/audit" element={<ErrorBoundary key="audit"><AnimatedPage><AuditLog /></AnimatedPage></ErrorBoundary>} />
+
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </AnimatePresence>

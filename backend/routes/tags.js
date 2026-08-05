@@ -2,6 +2,7 @@ const express = require('express');
 const Tag = require('../models/Tag');
 const auth = require('../middleware/auth');
 const admin = require('../middleware/admin');
+const { clearTagOverdue } = require('../services/handleTagEvent');
 const router = express.Router();
 
 // All tag routes require authentication
@@ -125,6 +126,8 @@ router.patch('/:id', auth, zoneManagerCheck, async (req, res, next) => {
       tag.overdueAlertStart = null;
       tag.lastOverdueEmailSentAt = null;
       await tag.save();
+      // Sync TagAlertState so the Live Alerts dashboard clears too
+      try { await clearTagOverdue(tag.tagId); } catch (e) {}
     }
     res.json(tag);
   } catch (err) {

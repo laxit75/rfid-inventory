@@ -5,6 +5,7 @@ const Zone = require('../models/Zone');
 const Reader = require('../models/Reader');
 const TagLifecycle = require('../models/TagLifecycle');
 const realtime = require('./realtime');
+const { handleTagEvent, clearTagOverdue } = require('./handleTagEvent');
 
 
 async function getZoneByReader(readerId) {
@@ -162,6 +163,15 @@ async function handleExit(tagId, readerId) {
         actor: 'system',
         details: result && result.violation ? 'Unintentional exit (zone violation)' : 'Intentional exit'
       });
+    // If a violation was detected, also update TagAlertState for the alert dashboard
+    if (result && result.violation) {
+      try {
+        await handleTagEvent({ tagId, zoneId: zone ? zone._id.toString() : '', eventType: 'exit' }, { isViolation: true });
+      } catch (e) {
+        // best-effort — TagAlertState update failure should not block movement processing
+      }
+    }
+
     return { tag, movement: result && result.violation ? 'UNINTENTIONAL' : 'INTENTIONAL', alertTriggered: result && result.violation };
   }
 
@@ -177,6 +187,8 @@ async function handleExit(tagId, readerId) {
       tag.alertStatus = 'NONE';
       tag.overdueAlertStart = null;
       tag.lastOverdueEmailSentAt = null;
+      // Sync TagAlertState so the Live Alerts dashboard clears too
+      try { await clearTagOverdue(tagId); } catch (e) {}
     }
     await tag.save();
     const mv = await MovementEvent.create({
@@ -253,6 +265,13 @@ async function handleReturn(tagId, readerId) {
     if (lastExit) {
       lastExit.resolvedAt = new Date();
       await lastExit.save();
+    }
+
+    // Also update TagAlertState to keep the alert dashboard in sync
+    try {
+      await handleTagEvent({ tagId, zoneId: zone ? zone._id.toString() : '', eventType: 'return' }, { isViolation: false });
+    } catch (e) {
+      // TagAlertState may not exist for this tag; ignore
     }
   }
 

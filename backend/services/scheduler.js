@@ -2,9 +2,13 @@ const Tag = require('../models/Tag');
 const Settings = require('../models/Settings');
 const AlertLog = require('../models/AlertLog');
 const { publishEmailJob } = require('./queue');
+const { syncTagOverdue } = require('./handleTagEvent');
 const logger = require('../utils/logger');
 
 let intervalId;
+// One-time backfill for tags already flagged OVERDUE before the
+// TagAlertState sync existed, so they appear on the Live Alerts page.
+let overdueStatesBackfilled = false;
 
 function startScheduler() {
   intervalId = setInterval(processTags, 2000);
@@ -39,8 +43,29 @@ async function processTags() {
         publishEmailJob({ tagId: tag.tagId, type: 'OVERDUE' });
         tag.lastOverdueEmailSentAt = new Date();
         await tag.save();
+        // Keep the Live Alerts dashboard (TagAlertState) in sync
+        try {
+          await syncTagOverdue(tag.tagId, tag.currentZone?._id?.toString() || '');
+        } catch (syncErr) {
+          logger.warn('Failed to sync TagAlertState for overdue tag', { tagId: tag.tagId, error: syncErr.message });
+        }
       } catch (err) {
         logger.error('Failed to process overdue alert', { tagId: tag.tagId, error: err.message });
+      }
+    }
+
+    // Backfill TagAlertState for tags already flagged OVERDUE (e.g. created
+    // before this sync existed), so they show up on Live Alerts too.
+    if (!overdueStatesBackfilled) {
+      try {
+        const existingOverdue = await Tag.find({ alertStatus: 'OVERDUE' }).select('tagId currentZone').lean();
+        for (const tag of existingOverdue) {
+          // currentZone is not populated here, so it is a raw ObjectId
+          await syncTagOverdue(tag.tagId, String(tag.currentZone || ''));
+        }
+        overdueStatesBackfilled = true;
+      } catch (err) {
+        logger.warn('Failed to backfill overdue alert states', { error: err.message });
       }
     }
 

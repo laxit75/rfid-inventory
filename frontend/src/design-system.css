@@ -1,0 +1,1115 @@
+
+/* ─── Typography ─────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ─── Design Tokens — Light Theme (White Primary, Black Secondary) ─── */
+:root {
+  /* Accent — electric blue (matches the login screen) */
+  --cc-accent: #2f67f6;
+  --cc-accent-dim: rgba(47, 103, 246, 0.75);
+  --cc-accent-glow: rgba(47, 103, 246, 0.22);
+  --cc-accent-subtle: rgba(47, 103, 246, 0.08);
+  --cc-accent-deep: #1a4ad4;
+
+  /* Light theme base (white primary) — cool slate-tinted neutrals */
+  --cc-bg-deep: #f3f5fa;
+  --cc-bg-mid: #ffffff;
+  --cc-bg-surface: rgba(15, 23, 42, 0.04);
+  --cc-bg-surface-hover: rgba(47, 103, 246, 0.06);
+
+  /* Glass morphism — light version */
+  --cc-glass-bg: rgba(255, 255, 255, 0.82);
+  --cc-glass-border: rgba(15, 23, 42, 0.08);
+  --cc-glass-blur: 16px;
+
+  /* Text colors — slate scale on light */
+  --cc-text-primary: rgba(15, 23, 42, 0.93);
+  --cc-text-secondary: rgba(71, 85, 105, 0.92);
+  --cc-text-muted: rgba(100, 116, 139, 0.9);
+
+  /* Shadows — layered, softer for light theme */
+  --cc-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 14px rgba(15, 23, 42, 0.05);
+  --cc-shadow-md: 0 2px 4px rgba(15, 23, 42, 0.04), 0 12px 28px rgba(15, 23, 42, 0.08);
+  --cc-shadow-lg: 0 4px 8px rgba(15, 23, 42, 0.05), 0 24px 56px rgba(15, 23, 42, 0.11);
+  --cc-shadow-glow: 0 6px 20px rgba(47, 103, 246, 0.18);
+
+  /* Transitions */
+  --cc-transition-fast: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --cc-transition-smooth: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  --cc-transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Border radius */
+  --cc-radius-sm: 8px;
+  --cc-radius-md: 14px;
+  --cc-radius-lg: 20px;
+  --cc-radius-xl: 28px;
+  --cc-radius-full: 9999px;
+}
+
+/* ─── Glass Card Component ───────────────────────────────────── */
+.cc-glass {
+  background: var(--cc-glass-bg);
+  backdrop-filter: blur(var(--cc-glass-blur));
+  -webkit-backdrop-filter: blur(var(--cc-glass-blur));
+  border: 1px solid var(--cc-glass-border);
+  border-radius: var(--cc-radius-lg);
+  box-shadow: var(--cc-shadow-sm);
+}
+
+.cc-glass-strong {
+  background: #ffffff;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  border-radius: var(--cc-radius-lg);
+  box-shadow: var(--cc-shadow-md);
+}
+
+/* ─── Hatch Overlay — subtle for light theme ─────────────────── */
+.aurora-hatch-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    115deg,
+    rgba(0, 0, 0, 0.02) 0px,
+    rgba(0, 0, 0, 0.02) 1px,
+    transparent 1px,
+    transparent 9px
+  );
+  mix-blend-mode: multiply;
+}
+
+/* ─── Aurora Container ───────────────────────────────────────── */
+.aurora-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── Floating Animation ─────────────────────────────────────── */
+.cc-float {
+  animation: cc-floaty 5.5s ease-in-out infinite;
+}
+
+@keyframes cc-floaty {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Stagger delays for floating cards */
+.cc-float-1 { animation-delay: 0.1s; }
+.cc-float-2 { animation-delay: 0.3s; }
+.cc-float-3 { animation-delay: 0.5s; }
+.cc-float-4 { animation-delay: 0.7s; }
+.cc-float-5 { animation-delay: 0.9s; }
+
+/* ─── Tilt Card ──────────────────────────────────────────────── */
+.cc-tilt {
+  transform-style: preserve-3d;
+  will-change: transform;
+  transition: transform var(--cc-transition-smooth);
+}
+
+.cc-tilt:hover {
+  transform: translateY(-4px) scale(1.02);
+}
+
+/* ─── Word Reveal Animation ──────────────────────────────────── */
+.cc-word-reveal .word {
+  display: inline-block;
+  transform: translateY(115%);
+  opacity: 0;
+  filter: blur(10px);
+}
+
+.cc-word-reveal .word-wrap {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+  padding-bottom: 0.08em;
+}
+
+/* ─── Magnetic Button ────────────────────────────────────────── */
+.cc-magnetic {
+  transition: transform var(--cc-transition-smooth);
+}
+
+.cc-magnetic:active {
+  transform: scale(0.96);
+}
+
+/* ─── Accent Button — black on white ─────────────────────────── */
+.cc-btn-accent {
+  background: linear-gradient(135deg, var(--cc-accent), var(--cc-accent-deep));
+  color: #ffffff;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--cc-radius-full);
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(47, 103, 246, 0.22);
+  transition: transform var(--cc-transition-fast),
+              box-shadow var(--cc-transition-fast),
+              filter var(--cc-transition-fast);
+}
+
+.cc-btn-accent:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 10px 30px rgba(47, 103, 246, 0.34);
+  transform: translateY(-2px);
+}
+
+.cc-btn-accent:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* ─── Ghost Button (outline) — light theme ───────────────────── */
+.cc-btn-ghost {
+  background: transparent;
+  color: var(--cc-text-primary);
+  font-weight: 600;
+  border: 1px solid var(--cc-glass-border);
+  border-radius: var(--cc-radius-full);
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
+  transition: transform var(--cc-transition-fast),
+              border-color var(--cc-transition-fast),
+              background var(--cc-transition-fast);
+}
+
+.cc-btn-ghost:hover {
+  border-color: rgba(47, 103, 246, 0.5);
+  background: var(--cc-accent-subtle);
+  color: var(--cc-accent);
+  transform: scale(1.04);
+}
+
+/* ─── Stat Card (Dashboard) — light theme ────────────────────── */
+.cc-stat-card {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.07);
+  border-radius: 18px;
+  padding: 1.25rem;
+  box-shadow: var(--cc-shadow-sm);
+  transition: transform var(--cc-transition-smooth),
+              box-shadow var(--cc-transition-smooth),
+              border-color var(--cc-transition-smooth);
+  cursor: pointer;
+}
+
+.cc-stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--cc-shadow-md);
+  border-color: rgba(47, 103, 246, 0.28);
+}
+
+.cc-stat-card__value {
+  font-size: 2.2rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.02em !important;
+  color: var(--cc-text-primary) !important;
+  line-height: 1.1;
+}
+
+.cc-stat-card__icon {
+  font-size: 1.4rem !important;
+  width: 44px !important;
+  height: 44px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, rgba(47, 103, 246, 0.10), rgba(47, 103, 246, 0.03)) !important;
+  border: 1px solid rgba(47, 103, 246, 0.16) !important;
+  opacity: 1 !important;
+  flex-shrink: 0;
+  transition: transform var(--cc-transition-fast), box-shadow var(--cc-transition-fast);
+}
+
+.cc-stat-card:hover .cc-stat-card__icon {
+  transform: scale(1.06);
+  box-shadow: 0 4px 12px rgba(47, 103, 246, 0.2);
+}
+
+.cc-stat-card__label {
+  font-size: 0.85rem;
+  color: var(--cc-text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.cc-stat-card__value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--cc-text-primary);
+  line-height: 1;
+}
+
+.cc-stat-card__hint {
+  font-size: 0.78rem;
+  color: var(--cc-text-muted);
+  margin-top: 0.5rem;
+  transition: color var(--cc-transition-fast);
+}
+
+.cc-stat-card:hover .cc-stat-card__hint {
+  color: var(--cc-accent);
+}
+
+/* ─── Status Pill — light theme ──────────────────────────────── */
+.cc-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.42rem 0.8rem;
+  border-radius: var(--cc-radius-full);
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+
+/* Interaction affordances only on interactive pills (buttons) */
+button.cc-pill { cursor: pointer; }
+
+button.cc-pill:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+
+button.cc-pill:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.cc-pill--healthy {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.cc-pill--alarm {
+  background: rgba(239, 68, 68, 0.10);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.cc-pill--warning {
+  background: rgba(245, 158, 11, 0.10);
+  color: #92400e;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.cc-pill--neutral {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--cc-text-secondary);
+  border: 1px solid var(--cc-glass-border);
+}
+
+/* ─── Live Badge — light theme ───────────────────────────────── */
+.cc-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.38rem 0.8rem;
+  border-radius: var(--cc-radius-full);
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--cc-text-primary);
+}
+
+.cc-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: cc-pulse 2s ease-in-out infinite;
+}
+
+@keyframes cc-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 6px transparent; }
+}
+
+/* ─── Animated Bar Chart (for dashboards) ────────────────────── */
+.cc-bar {
+  transform-origin: bottom;
+  animation: cc-barGrow 2.2s ease-in-out infinite alternate;
+}
+
+@keyframes cc-barGrow {
+  0% { transform: scaleY(0.35); }
+  100% { transform: scaleY(1); }
+}
+
+/* ─── Slide & Fade Entry Animations ──────────────────────────── */
+@keyframes cc-slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cc-fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes cc-scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.cc-animate-in {
+  animation: cc-slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.cc-animate-fade {
+  animation: cc-fadeIn 0.4s ease forwards;
+}
+
+/* ─── Pulse Ping (for live indicators) ───────────────────────── */
+.cc-ping {
+  animation: cc-pingRing 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes cc-pingRing {
+  0% { transform: scale(1); opacity: 1; }
+  75%, 100% { transform: scale(2); opacity: 0; }
+}
+
+/* ─── Reduced Motion ─────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .cc-float,
+  .cc-bar,
+  .cc-ping,
+  .cc-live-dot {
+    animation: none !important;
+  }
+  .cc-animate-in {
+    animation: none !important;
+    opacity: 1;
+  }
+}
+
+/* ─── Selection ──────────────────────────────────────────────── */
+.cc-root ::selection,
+.cc-glass ::selection,
+::selection {
+  background: var(--cc-accent);
+  color: #ffffff;
+}
+
+/* ─── Background radial gradients — subtle for light theme ──── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 720px 460px at 12% 8%, rgba(47, 103, 246, 0.05) 0%, transparent 70%),
+    radial-gradient(ellipse 560px 420px at 88% 6%, rgba(14, 165, 233, 0.04) 0%, transparent 70%),
+    radial-gradient(ellipse 460px 380px at 4% 62%, rgba(139, 92, 246, 0.03) 0%, transparent 70%);
+}
+#root { position: relative; z-index: 1; }
+
+/* ═══════════════════════════════════════════════════════════════
+   OVERRIDES for old index.css class names
+   Forces light theme on legacy classes
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Page header */
+.page-head,
+.nx-page-head,
+.admin-shell .page-head,
+.admin-shell .nx-page-head {
+  background: var(--cc-glass-bg) !important;
+  backdrop-filter: blur(var(--cc-glass-blur)) !important;
+  -webkit-backdrop-filter: blur(var(--cc-glass-blur)) !important;
+  border: 1px solid var(--cc-glass-border) !important;
+  color: var(--cc-text-primary) !important;
+}
+
+/* Content cards */
+.content-card,
+.admin-shell .content-card {
+  background: var(--cc-glass-bg) !important;
+  backdrop-filter: blur(var(--cc-glass-blur)) !important;
+  -webkit-backdrop-filter: blur(var(--cc-glass-blur)) !important;
+  border: 1px solid var(--cc-glass-border) !important;
+  color: var(--cc-text-primary) !important;
+}
+
+/* Stat cards */
+.stat-card,
+.nx-stat-card {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid var(--cc-glass-border) !important;
+}
+
+/* Eyebrow labels */
+.eyebrow {
+  color: var(--cc-accent) !important;
+}
+
+/* Page subtitles and card copy */
+.page-subtitle,
+.card-copy {
+  color: var(--cc-text-secondary) !important;
+}
+
+/* Tabs with light theme */
+.nx-tabs,
+.tabs {
+  background: var(--cc-glass-bg) !important;
+  border: 1px solid var(--cc-glass-border) !important;
+  border-radius: var(--cc-radius-md) !important;
+}
+.nx-tab,
+.tabs button {
+  color: var(--cc-text-secondary) !important;
+  border-color: transparent !important;
+  background: transparent !important;
+}
+.nx-tab.active,
+.tabs button.active {
+  background: rgba(0, 0, 0, 0.08) !important;
+  color: var(--cc-accent) !important;
+}
+
+/* Loading and empty states */
+.loading-state,
+.empty-state {
+  background: rgba(0, 0, 0, 0.03) !important;
+  color: var(--cc-text-secondary) !important;
+}
+
+/* nx-badge overrides — light theme */
+.nx-badge {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: var(--cc-text-secondary) !important;
+  border: 1px solid var(--cc-glass-border) !important;
+}
+.nx-badge-danger {
+  background: rgba(239, 68, 68, 0.10) !important;
+  color: #b91c1c !important;
+  border-color: rgba(239, 68, 68, 0.25) !important;
+}
+.nx-badge-warning {
+  background: rgba(245, 158, 11, 0.10) !important;
+  color: #92400e !important;
+  border-color: rgba(245, 158, 11, 0.25) !important;
+}
+.nx-badge-success {
+  background: rgba(34, 197, 94, 0.10) !important;
+  color: #166534 !important;
+  border-color: rgba(34, 197, 94, 0.22) !important;
+}
+
+/* nx-live badge */
+.nx-live {
+  background: var(--cc-glass-bg) !important;
+  border: 1px solid var(--cc-glass-border) !important;
+  color: var(--cc-text-primary) !important;
+}
+
+/* nx-btn overrides — light theme */
+.nx-btn {
+  color: var(--cc-text-primary) !important;
+  border: 1px solid var(--cc-glass-border) !important;
+  background: var(--cc-glass-bg) !important;
+}
+.nx-btn-ghost {
+  color: var(--cc-text-secondary) !important;
+  background: transparent !important;
+  border: 1px solid var(--cc-glass-border) !important;
+}
+.nx-btn-success {
+  background: rgba(34, 197, 94, 0.10) !important;
+  color: #166534 !important;
+  border: 1px solid rgba(34, 197, 94, 0.22) !important;
+}
+
+/* nx-table overrides — light theme */
+.nx-table th {
+  color: var(--cc-text-muted) !important;
+  border-bottom-color: var(--cc-glass-border) !important;
+}
+.nx-table td {
+  border-bottom-color: rgba(0, 0, 0, 0.06) !important;
+  color: var(--cc-text-primary) !important;
+}
+.nx-table tbody tr:hover {
+  background: rgba(0, 0, 0, 0.03) !important;
+}
+.nx-row-alerting {
+  background: rgba(239, 68, 68, 0.06) !important;
+}
+
+/* Date inputs — light theme */
+input[type="date"] {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid var(--cc-glass-border) !important;
+  color: var(--cc-text-primary) !important;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none;
+  opacity: 0.55;
+}
+
+/* Legacy form fields forced light */
+.field-group input,
+.field-group select,
+.field-group textarea {
+  background: #ffffff !important;
+  border-color: var(--cc-glass-border) !important;
+  color: var(--cc-text-primary) !important;
+}
+.field-group input::placeholder,
+.field-group textarea::placeholder {
+  color: var(--cc-text-muted) !important;
+}
+.field-group input:focus,
+.field-group select:focus,
+.field-group textarea:focus {
+  border-color: rgba(0, 0, 0, 0.35) !important;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06) !important;
+  outline: none;
+}
+.field-group > span,
+.field-group > label {
+  color: var(--cc-text-secondary) !important;
+}
+
+/* Legacy table forced light */
+.data-table {
+  background: transparent !important;
+  color: var(--cc-text-primary) !important;
+}
+.data-table th {
+  color: var(--cc-text-muted) !important;
+  border-bottom-color: var(--cc-glass-border) !important;
+  background: rgba(0, 0, 0, 0.02) !important;
+}
+.data-table td {
+  border-bottom-color: var(--cc-glass-border) !important;
+  color: var(--cc-text-primary) !important;
+}
+.data-table tbody tr:hover {
+  background: rgba(0, 0, 0, 0.03) !important;
+}
+
+/* Legacy .table forced light */
+.table {
+  background: transparent !important;
+  color: var(--cc-text-primary) !important;
+}
+.table th {
+  color: var(--cc-text-muted) !important;
+  border-bottom-color: var(--cc-glass-border) !important;
+  background: rgba(0, 0, 0, 0.02) !important;
+}
+.table td {
+  border-bottom-color: var(--cc-glass-border) !important;
+  color: var(--cc-text-primary) !important;
+}
+
+/* nx-page-head h2 color */
+.nx-page-head h2,
+.page-head h2 {
+  color: var(--cc-text-primary) !important;
+}
+
+/* Page shell headings */
+.page-shell h2,
+.page-shell h3 {
+  color: var(--cc-text-primary) !important;
+}
+
+/* Fix filter-bar inputs forced light */
+.filter-bar input,
+.filter-bar select {
+  background: #ffffff !important;
+  border-color: var(--cc-glass-border) !important;
+  color: var(--cc-text-primary) !important;
+}
+
+/* Timeline text color fixes */
+.timeline-day h4 {
+  color: var(--cc-text-muted) !important;
+}
+.timeline-body p {
+  color: var(--cc-text-secondary) !important;
+}
+.timeline-time {
+  color: var(--cc-text-muted) !important;
+}
+
+/* ─── Legacy .button classes forced light ─────────────────────── */
+.button {
+  background: rgba(0, 0, 0, 0.08) !important;
+  color: var(--cc-text-primary) !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+}
+.button:hover {
+  background: rgba(0, 0, 0, 0.12) !important;
+  border-color: rgba(0, 0, 0, 0.25) !important;
+}
+.button.button-primary,
+.button-primary {
+  background: #1a1a1a !important;
+  color: white !important;
+  border-color: #1a1a1a !important;
+}
+.button.button-primary:hover,
+.button-primary:hover {
+  background: #333333 !important;
+}
+.button.button-secondary,
+.button-secondary {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: rgba(0, 0, 0, 0.80) !important;
+  border-color: rgba(0, 0, 0, 0.18) !important;
+}
+.button.button-ghost,
+.button-ghost {
+  background: transparent !important;
+  color: rgba(0, 0, 0, 0.65) !important;
+  border-color: rgba(0, 0, 0, 0.18) !important;
+}
+.button.button-danger,
+.button-danger {
+  background: rgba(239, 68, 68, 0.12) !important;
+  color: #b91c1c !important;
+  border-color: rgba(239, 68, 68, 0.30) !important;
+}
+
+/* ─── page-shell background ──────────────────────────────────── */
+.page-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ─── Inline content panels ──────────────────────────────────── */
+.content-panel {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid var(--cc-glass-border) !important;
+  color: var(--cc-text-primary) !important;
+}
+
+/* ─── Group cards (DeviceGroups, AlertFlows, etc.) — light ───── */
+.group-card {
+  background: #ffffff !important;
+  border-color: var(--cc-glass-border) !important;
+  color: var(--cc-text-primary) !important;
+}
+.group-card:hover {
+  background: rgba(0, 0, 0, 0.02) !important;
+  border-color: rgba(0, 0, 0, 0.20) !important;
+}
+.group-card--active {
+  border-color: rgba(0, 0, 0, 0.35) !important;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15) !important;
+}
+.group-card__desc {
+  color: var(--cc-text-secondary) !important;
+}
+.group-card__actions {
+  border-top-color: var(--cc-glass-border) !important;
+}
+.flow-route {
+  background: rgba(0, 0, 0, 0.03) !important;
+}
+.flow-route__label {
+  color: var(--cc-text-muted) !important;
+}
+.flow-route__arrow {
+  color: var(--cc-text-muted) !important;
+}
+.multi-select-list {
+  background: #ffffff !important;
+  border-color: var(--cc-glass-border) !important;
+}
+.multi-select-item {
+  color: var(--cc-text-primary) !important;
+  border-bottom-color: rgba(0, 0, 0, 0.04) !important;
+}
+.multi-select-item:hover {
+  background: rgba(0, 0, 0, 0.03) !important;
+}
+.multi-select-item.selected {
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* ─── Zone cards (Simulator) ─────────────────────────────────── */
+.zone-card {
+  background: #ffffff !important;
+  border-color: var(--cc-glass-border) !important;
+  color: var(--cc-text-primary) !important;
+}
+.zone-card.active {
+  border-color: rgba(0, 0, 0, 0.35) !important;
+  background: rgba(0, 0, 0, 0.04) !important;
+}
+.zone-card span {
+  color: var(--cc-text-secondary) !important;
+}
+.tag-detail {
+  background: #ffffff !important;
+  color: var(--cc-text-primary) !important;
+}
+.detail-grid p {
+  color: var(--cc-text-secondary) !important;
+}
+
+/* ─── Summary and report cards ───────────────────────────────── */
+.report-metrics > div {
+  background: #ffffff !important;
+  border-color: var(--cc-glass-border) !important;
+  color: var(--cc-text-primary) !important;
+}
+.report-metrics span {
+  color: var(--cc-text-secondary) !important;
+}
+.report-metrics strong {
+  color: var(--cc-text-primary) !important;
+}
+
+/* ─── Inline banners — light theme ───────────────────────────── */
+.inline-banner.success {
+  background: rgba(34, 197, 94, 0.08) !important;
+  color: #166534 !important;
+  border-color: rgba(34, 197, 94, 0.20) !important;
+}
+.inline-banner.error {
+  background: rgba(239, 68, 68, 0.08) !important;
+  color: #b91c1c !important;
+  border-color: rgba(239, 68, 68, 0.20) !important;
+}
+.inline-banner.info {
+  background: rgba(14, 165, 233, 0.08) !important;
+  color: #1e40af !important;
+  border-color: rgba(14, 165, 233, 0.18) !important;
+}
+
+/* ─── Summary pills — light theme ────────────────────────────── */
+.summary-pill {
+  background: rgba(0, 0, 0, 0.04) !important;
+  color: var(--cc-text-secondary) !important;
+  border-color: var(--cc-glass-border) !important;
+}
+.summary-pill.healthy {
+  background: rgba(34, 197, 94, 0.08) !important;
+  color: #166534 !important;
+  border-color: rgba(34, 197, 94, 0.18) !important;
+}
+.summary-pill.alarming {
+  background: rgba(239, 68, 68, 0.10) !important;
+  color: #b91c1c !important;
+  border-color: rgba(239, 68, 68, 0.25) !important;
+}
+.summary-pill.overdue {
+  background: rgba(245, 158, 11, 0.08) !important;
+  color: #92400e !important;
+  border-color: rgba(245, 158, 11, 0.20) !important;
+}
+
+/* ─── Alert banner ───────────────────────────────────────────── */
+.alert-banner {
+  background: rgba(239, 68, 68, 0.06) !important;
+  border-color: rgba(239, 68, 68, 0.18) !important;
+  color: #b91c1c !important;
+}
+
+/* ─── Status pill overrides — light theme ────────────────────── */
+.status-pill.danger {
+  background: rgba(239, 68, 68, 0.10) !important;
+  color: #b91c1c !important;
+}
+.status-pill.warning {
+  background: rgba(245, 158, 11, 0.10) !important;
+  color: #92400e !important;
+}
+.status-pill.neutral {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: rgba(0, 0, 0, 0.55) !important;
+}
+.status-pill.success {
+  background: rgba(34, 197, 94, 0.08) !important;
+  color: #166534 !important;
+}
+
+/* ─── Chip overrides ─────────────────────────────────────────── */
+.chip {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: var(--cc-text-secondary) !important;
+}
+.chip-warning {
+  background: rgba(245, 158, 11, 0.08) !important;
+  color: #92400e !important;
+}
+
+/* ─── Confirm dialog forced light ────────────────────────────── */
+.confirm-dialog {
+  background: #ffffff !important;
+  border: 1px solid var(--cc-glass-border) !important;
+  color: var(--cc-text-primary) !important;
+}
+.confirm-message {
+  color: var(--cc-text-secondary) !important;
+}
+.confirm-header h3 {
+  color: var(--cc-text-primary) !important;
+}
+
+/* ─── Admin notes and protected badges ───────────────────────── */
+.admin-note {
+  background: rgba(245, 158, 11, 0.06) !important;
+  border-color: rgba(245, 158, 11, 0.18) !important;
+  color: #92400e !important;
+}
+.protected-badge {
+  background: rgba(245, 158, 11, 0.08) !important;
+  border-color: rgba(245, 158, 11, 0.20) !important;
+  color: #92400e !important;
+}
+
+/* ─── Pagination controls ────────────────────────────────────── */
+.pagination-info {
+  color: var(--cc-text-secondary) !important;
+}
+.pagination-size-select,
+.pagination-btn {
+  background: #ffffff !important;
+  border-color: var(--cc-glass-border) !important;
+  color: var(--cc-text-primary) !important;
+}
+.pagination-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.04) !important;
+}
+.pagination-page {
+  color: var(--cc-text-secondary) !important;
+}
+
+/* ─── Global select fix: ensure light dropdown ───────────────── */
+select option {
+  background: #ffffff;
+  color: rgba(0, 0, 0, 0.90);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SHARED cc-* COMPONENT THEME (enforced)
+   Several pages duplicate these classes in their own inline
+   <style> blocks with drifted colors (some near-invisible on the
+   light content area). This section enforces one coherent light +
+   blue look app-wide, so every page stays consistent.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Page headers */
+.cc-page-header {
+  background: linear-gradient(180deg, #ffffff 0%, #f7f9fe 100%) !important;
+  backdrop-filter: blur(var(--cc-glass-blur)) !important;
+  -webkit-backdrop-filter: blur(var(--cc-glass-blur)) !important;
+  border: 1px solid rgba(15, 23, 42, 0.07) !important;
+  border-radius: 18px !important;
+  box-shadow: var(--cc-shadow-sm) !important;
+}
+.cc-page-title { color: var(--cc-text-primary) !important; }
+.cc-page-subtitle { color: var(--cc-text-secondary) !important; }
+.cc-eyebrow { color: #1d4ed8 !important; }
+
+/* Content cards */
+.cc-content-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(15, 23, 42, 0.07) !important;
+  border-radius: 18px !important;
+  box-shadow: var(--cc-shadow-sm) !important;
+  transition: box-shadow var(--cc-transition-smooth), border-color var(--cc-transition-smooth) !important;
+}
+
+.cc-content-card:hover {
+  box-shadow: var(--cc-shadow-md) !important;
+  border-color: rgba(47, 103, 246, 0.14) !important;
+}
+.cc-card-title { color: var(--cc-text-primary) !important; }
+.cc-card-subtitle { color: var(--cc-text-secondary) !important; }
+
+/* Buttons */
+.cc-btn-accent {
+  background: linear-gradient(135deg, var(--cc-accent), var(--cc-accent-deep)) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: var(--cc-radius-full) !important;
+  box-shadow: 0 6px 18px rgba(47, 103, 246, 0.24) !important;
+  transition: transform var(--cc-transition-fast), box-shadow var(--cc-transition-fast), filter var(--cc-transition-fast) !important;
+}
+.cc-btn-accent:hover {
+  filter: brightness(1.08) !important;
+  box-shadow: 0 10px 26px rgba(47, 103, 246, 0.34) !important;
+  transform: translateY(-2px) !important;
+}
+.cc-btn-accent:active {
+  transform: translateY(0) scale(0.97) !important;
+}
+.cc-btn-ghost {
+  color: var(--cc-text-primary) !important;
+  border: 1px solid rgba(15, 23, 42, 0.13) !important;
+  background: transparent !important;
+  border-radius: var(--cc-radius-full) !important;
+  transition: transform var(--cc-transition-fast), box-shadow var(--cc-transition-fast), border-color var(--cc-transition-fast), background var(--cc-transition-fast), color var(--cc-transition-fast) !important;
+}
+.cc-btn-ghost:hover {
+  border-color: rgba(47, 103, 246, 0.5) !important;
+  background: rgba(47, 103, 246, 0.05) !important;
+  color: var(--cc-accent) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 14px rgba(47, 103, 246, 0.12) !important;
+}
+.cc-btn-ghost:active {
+  transform: translateY(0) scale(0.97) !important;
+}
+
+/* Data tables */
+.cc-data-table th {
+  color: var(--cc-text-muted) !important;
+  font-size: 0.74rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+  border-bottom-color: rgba(15, 23, 42, 0.08) !important;
+  background: linear-gradient(180deg, rgba(47, 103, 246, 0.05), rgba(47, 103, 246, 0.02)) !important;
+  padding: 0.85rem 0.75rem !important;
+}
+.cc-data-table td {
+  color: var(--cc-text-primary) !important;
+  border-bottom-color: rgba(15, 23, 42, 0.06) !important;
+}
+.cc-data-table tbody tr { transition: background 150ms ease; }
+.cc-data-table tbody tr:hover { background: var(--cc-accent-subtle) !important; }
+
+/* Status pills */
+.cc-status-pill--danger { background: rgba(239, 68, 68, 0.10) !important; color: #b91c1c !important; }
+.cc-status-pill--warning { background: rgba(245, 158, 11, 0.10) !important; color: #92400e !important; }
+.cc-status-pill--neutral { background: rgba(0, 0, 0, 0.06) !important; color: var(--cc-text-secondary) !important; }
+.cc-status-pill--success { background: rgba(34, 197, 94, 0.10) !important; color: #166534 !important; }
+
+/* Pills */
+.cc-pill--healthy {
+  background: rgba(47, 103, 246, 0.08) !important;
+  color: #1d4ed8 !important;
+  border: 1px solid rgba(47, 103, 246, 0.20) !important;
+}
+.cc-pill--alarm {
+  background: rgba(239, 68, 68, 0.10) !important;
+  color: #b91c1c !important;
+  border: 1px solid rgba(239, 68, 68, 0.25) !important;
+}
+.cc-pill--warning {
+  background: rgba(245, 158, 11, 0.10) !important;
+  color: #92400e !important;
+  border: 1px solid rgba(245, 158, 11, 0.25) !important;
+}
+.cc-pill--neutral {
+  background: rgba(0, 0, 0, 0.04) !important;
+  color: var(--cc-text-secondary) !important;
+  border: 1px solid var(--cc-glass-border) !important;
+}
+
+/* Form controls (fixes dark dropdown options / invisible inputs) */
+.cc-input,
+.cc-inline-select,
+.cc-bulk-select,
+.cc-date-input {
+  background: #ffffff !important;
+  border-color: var(--cc-glass-border) !important;
+  color: var(--cc-text-primary) !important;
+}
+.cc-input:focus,
+.cc-inline-select:focus,
+.cc-date-input:focus {
+  border-color: var(--cc-accent) !important;
+  box-shadow: 0 0 0 3px rgba(47, 103, 246, 0.12) !important;
+  outline: none;
+}
+.cc-input option,
+.cc-inline-select option,
+.cc-bulk-select option,
+.cc-date-input option {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+.cc-field-group span,
+.cc-field-group > label {
+  color: var(--cc-text-secondary) !important;
+}
+
+/* Table row states */
+.cc-tag-row--selected {
+  background: rgba(47, 103, 246, 0.07) !important;
+  outline: 1px solid rgba(47, 103, 246, 0.25) !important;
+}
+.cc-tag-row--alarming { background: rgba(239, 68, 68, 0.05) !important; }
+.cc-tag-row--overdue { background: rgba(245, 158, 11, 0.05) !important; }
+
+/* Loading / empty states */
+.cc-loading-state,
+.cc-empty-state {
+  background: rgba(0, 0, 0, 0.03) !important;
+  color: var(--cc-text-secondary) !important;
+}
+.cc-loading-state::before {
+  border-color: rgba(0, 0, 0, 0.12) !important;
+  border-top-color: var(--cc-accent) !important;
+}
+
+/* Bulk action bar */
+.cc-bulk-bar {
+  background: var(--cc-accent-subtle) !important;
+  border: 1px solid rgba(47, 103, 246, 0.25) !important;
+}
+.cc-bulk-bar__count { color: var(--cc-text-primary) !important; }
+
+/* ─── Premium polish addendum ─────────────────────────────────── */
+
+/* Card titles & subtitles — shared baseline (matches page inline styles) */
+.cc-card-title {
+  margin: 0 !important;
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+}
+.cc-card-subtitle {
+  margin: 0.25rem 0 0 !important;
+  font-size: 0.88rem !important;
+  color: var(--cc-text-secondary) !important;
+}
+
+/* Table wrapper — allow horizontal scroll on overflow */
+.cc-table-wrapper {
+  overflow-x: auto !important;
+  margin: 0 -0.5rem !important;
+  padding: 0 0.5rem !important;
+}
+
+/* Empty / loading states — softer, centered */
+.cc-empty-state,
+.cc-loading-state {
+  background: rgba(15, 23, 42, 0.025) !important;
+  border: 1px dashed rgba(15, 23, 42, 0.10) !important;
+  border-radius: var(--cc-radius-md) !important;
+}
+
+/* Inline banners — softer tints */
+.cc-banner--info {
+  background: rgba(14, 165, 233, 0.07) !important;
+  border: 1px solid rgba(14, 165, 233, 0.16) !important;
+}
+.cc-banner--success {
+  background: rgba(34, 197, 94, 0.07) !important;
+  border: 1px solid rgba(34, 197, 94, 0.16) !important;
+}
+
+/* ─── Remove all [data-theme="dark"] blocks ──────────────────── */

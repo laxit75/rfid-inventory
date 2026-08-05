@@ -4,6 +4,7 @@ import { connectRealtime } from '../realtime'
 import { Link, useNavigate } from 'react-router-dom'
 import PieChart from './PieChart'
 import TrendChart from './TrendChart'
+import SplitText from './SplitText'
 
 export default function Dashboard({ siteId, soundEnabled, onEnableSound }) {
   const navigate = useNavigate()
@@ -93,10 +94,8 @@ export default function Dashboard({ siteId, soundEnabled, onEnableSound }) {
     fetchTags(true)
     fetchSettings()
     fetchSummary()
-    // Load default range (last 30 days) - single source of truth for trend data
     fetchTrendRange(trendStart, trendEnd)
 
-    // Realtime with polling fallback
     const sock = connectRealtime()
     const mergeTag = (incoming) => {
       if (!incoming) return
@@ -110,32 +109,23 @@ export default function Dashboard({ siteId, soundEnabled, onEnableSound }) {
       })
     }
 
-    // If socket connects, stop polling; if it disconnects, start polling after short delay
-    sock.on('connect', () => {
-      stopPolling()
-    })
+    sock.on('connect', () => { stopPolling() })
     sock.on('disconnect', () => {
-      // start polling fallback after 1s to allow quick reconnects
       if (pollFallbackTimer) clearTimeout(pollFallbackTimer)
       pollFallbackTimer = setTimeout(() => startPolling(true), 1000)
     })
     sock.on('connect_error', (err) => {
       console.warn('Realtime connect_error', err && err.message)
-      // If connection cannot be established, ensure polling runs
       startPolling(true)
     })
 
-    // Subscribe to events
     sock.on('tag:movement', (payload) => mergeTag(payload.tag || payload))
     sock.on('tag:alarm', (payload) => mergeTag(payload.tag || payload))
 
-    // If socket isn't connected shortly after mount, start polling
     if (!sock.connected) {
-      // allow short time for socket to connect before starting polling
       const t = setTimeout(() => {
         if (!sock.connected) startPolling(true)
       }, 800)
-      // store to clear on cleanup
       pollFallbackTimer = t
     }
 
@@ -183,6 +173,7 @@ export default function Dashboard({ siteId, soundEnabled, onEnableSound }) {
       setTagFilter(metric); scrollTo('tag-list')
     }
   }
+
   const exportCsv = () => {
     const headers = ['Tag ID', 'Equipment', 'Status', 'Assigned Zone', 'Current Zone', 'Alert Status']
     const rows = visibleTags.map(tag => [
@@ -193,7 +184,7 @@ export default function Dashboard({ siteId, soundEnabled, onEnableSound }) {
       tag.currentZone?.name || 'Outside all zones',
       tag.alertStatus
     ])
-    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n')
+    const csv = [headers.join(','), ...rows.map(r => r.map(c => `\"${c}\"`).join(','))].join('\\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -208,157 +199,247 @@ export default function Dashboard({ siteId, soundEnabled, onEnableSound }) {
   const visibleTags = tags.filter(tag => tagFilter === 'outside' ? !tag.currentZone : tagFilter === 'alarming' ? tag.alertStatus === 'ALARMING' : tagFilter === 'overdue' ? tag.alertStatus === 'OVERDUE' : true)
 
   return (
-    <div className="page-shell">
-      <div className="page-head">
+    <div className="cc-dashboard">
+      {/* Page Header */}
+      <div className="cc-page-header cc-animate-in">
         <div>
-          <p className="eyebrow">Live operations</p>
-          <h2>Lab dashboard</h2>
-          <p className="page-subtitle">Monitor tag movement, alarming equipment, and overdue exits in one place.</p>
+          <p className="cc-eyebrow">Live operations</p>
+          <SplitText
+            tag="h2"
+            text="Lab dashboard"
+            className="cc-page-title"
+            textAlign="left"
+            delay={40}
+            duration={0.8}
+            ease="power3.out"
+            splitType="words, chars"
+            from={{ opacity: 0, y: 24 }}
+            to={{ opacity: 1, y: 0 }}
+          />
+          <p className="cc-page-subtitle">Monitor tag movement, alarming equipment, and overdue exits in one place.</p>
         </div>
-        <div className="button-row">
-          <button className="button button-ghost" onClick={exportCsv} title="Download visible tags as CSV">
+        <div className="cc-page-actions">
+          <div className="cc-live-badge cc-live-badge--live">
+            <span className="cc-live-dot" />
+            LIVE
+          </div>
+          <button className="cc-btn-ghost cc-magnetic" onClick={exportCsv} title="Download visible tags as CSV">
             📥 Export CSV
           </button>
         </div>
       </div>
 
+      {/* Sound Notice */}
       {!soundEnabled && (
-        <div className="inline-banner info sound-banner">
+        <div className="cc-banner cc-banner--info">
           <span>Click to enable alarm sound for this session.</span>
-          <button className="button button-secondary" onClick={enableSound}>
+          <button className="cc-btn-accent cc-magnetic" onClick={enableSound} style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
             Enable sound
           </button>
         </div>
       )}
 
       {soundNotice && (
-        <div className={`inline-banner ${soundEnabled ? 'success' : 'info'}`}>
+        <div className={`cc-banner ${soundEnabled ? 'cc-banner--success' : 'cc-banner--info'}`}>
           {soundNotice}
         </div>
       )}
 
-      <div className="summary-strip">
-        <button className="summary-pill healthy" onClick={() => setTagFilter('')}>● {healthy} healthy</button>
-        <button className="summary-pill alarming" onClick={() => focusMetric('alarming')}>🚨 {activeAlarms} alarming</button>
-        <button className="summary-pill overdue" onClick={() => focusMetric('overdue')}>⏱ {overdue} overdue</button>
-        <button className="summary-pill muted" onClick={() => setTagFilter('')}>• {disabled} disabled</button>
-      </div>
-
-      <div className="stats-grid">
-        <button className="stat-card accent-info metric-card" onClick={() => focusMetric('today')}>
-          <div className="stat-title">Violations today</div>
-          <div className="stat-value">{violationsToday}</div>
-          <span className="metric-card__hint">View daily trend →</span>
+      {/* Status Pills */}
+      <div className="cc-status-pills">
+        <button className="cc-pill cc-pill--healthy" onClick={() => setTagFilter('')}>
+          ● {healthy} healthy
         </button>
-        <button className="stat-card accent-info metric-card" onClick={() => focusMetric('week')}>
-          <div className="stat-title">Violations this week</div>
-          <div className="stat-value">{violationsWeek}</div>
-          <span className="metric-card__hint">View weekly trend →</span>
+        <button className="cc-pill cc-pill--alarm" onClick={() => focusMetric('alarming')}>
+          🚨 {activeAlarms} alarming
         </button>
-        <button className="stat-card accent-secondary metric-card" onClick={() => focusMetric('resolution')}>
-          <div className="stat-title">Avg resolution</div>
-          <div className="stat-value">{avgResolutionMs !== null ? `${Math.round(avgResolutionMs / 1000)}s` : 'N/A'}</div>
-          <span className="metric-card__hint">Open summary report →</span>
+        <button className="cc-pill cc-pill--warning" onClick={() => focusMetric('overdue')}>
+          ⏱ {overdue} overdue
         </button>
-        <button className="stat-card accent-secondary metric-card" onClick={() => focusMetric('outside')}>
-          <div className="stat-title">Outside lab</div>
-          <div className="stat-value">{outside}</div>
-          <span className="metric-card__hint">View affected tags →</span>
+        <button className="cc-pill cc-pill--neutral" onClick={() => setTagFilter('')}>
+          • {disabled} disabled
         </button>
       </div>
 
-      <div className="content-card" id="violation-trend">
-        <div className="card-header">
-          <div>
-            <h3>Violation trend</h3>
-            <p className="card-copy">Alarms raised per day. Select a date range to focus the chart.</p>
+      {/* Primary Stats Grid */}
+      <div className="cc-stats-grid cc-animate-in" style={{ animationDelay: '0.1s' }}>
+        <button className="cc-stat-card cc-tilt" onClick={() => focusMetric('today')}>
+          <div className="cc-stat-card__header">
+            <div>
+              <div className="cc-stat-card__label">Violations today</div>
+              <div className="cc-stat-card__value">{violationsToday}</div>
+              {violationsToday > 0 && <div className="cc-stat-card__trend cc-stat-card__trend--up">↑ vs yesterday</div>}
+            </div>
+            <div className="cc-stat-card__icon">📊</div>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <label style={{ fontSize: 13, color: '#475569' }}>From
-              <input type="date" style={{ marginLeft: 8 }} value={trendStart || ''} onChange={e => setTrendStart(e.target.value)} />
-            </label>
-            <label style={{ fontSize: 13, color: '#475569' }}>To
-              <input type="date" style={{ marginLeft: 8 }} value={trendEnd || ''} onChange={e => setTrendEnd(e.target.value)} />
-            </label>
-            <button className="button button-secondary" onClick={() => fetchTrendRange(trendStart, trendEnd)}>Apply</button>
-            <button className="button button-ghost" onClick={() => { const d = new Date(); const s = new Date(d.getTime() - 29 * 24 * 60 * 60 * 1000); setTrendStart(s.toISOString().slice(0,10)); setTrendEnd(d.toISOString().slice(0,10)); fetchTrendRange(s.toISOString().slice(0,10), d.toISOString().slice(0,10)); }}>Last 30d</button>
+          <span className="cc-stat-card__hint">View daily trend →</span>
+        </button>
+
+        <button className="cc-stat-card cc-tilt" onClick={() => focusMetric('week')}>
+          <div className="cc-stat-card__header">
+            <div>
+              <div className="cc-stat-card__label">Violations this week</div>
+              <div className="cc-stat-card__value">{violationsWeek}</div>
+              {violationsWeek > 0 && <div className="cc-stat-card__trend cc-stat-card__trend--up">↑ weekly count</div>}
+            </div>
+            <div className="cc-stat-card__icon">📈</div>
+          </div>
+          <span className="cc-stat-card__hint">View weekly trend →</span>
+        </button>
+
+        <button className="cc-stat-card cc-tilt" onClick={() => focusMetric('resolution')}>
+          <div className="cc-stat-card__header">
+            <div>
+              <div className="cc-stat-card__label">Avg resolution</div>
+              <div className="cc-stat-card__value">{avgResolutionMs !== null ? `${Math.round(avgResolutionMs / 1000)}s` : 'N/A'}</div>
+            </div>
+            <div className="cc-stat-card__icon">⚡</div>
+          </div>
+          <span className="cc-stat-card__hint">Open summary report →</span>
+        </button>
+
+        <button className="cc-stat-card cc-tilt" onClick={() => focusMetric('outside')}>
+          <div className="cc-stat-card__header">
+            <div>
+              <div className="cc-stat-card__label">Outside lab</div>
+              <div className="cc-stat-card__value">{outside}</div>
+              {outside > 0 && <div className="cc-stat-card__trend cc-stat-card__trend--down">↓ needs attention</div>}
+            </div>
+            <div className="cc-stat-card__icon">📍</div>
+          </div>
+          <span className="cc-stat-card__hint">View affected tags →</span>
+        </button>
+      </div>
+
+      {/* Violation Distribution — big centered donut */}
+      <div className="cc-content-card cc-animate-in" style={{ animationDelay: '0.2s' }}>
+        <div className="cc-card-header">
+          <div>
+            <h3 className="cc-card-title">Violation distribution</h3>
+            <p className="cc-card-subtitle">Current proportion of tag alert statuses.</p>
           </div>
         </div>
-        <div className="trend-chart">
+        <div className="cc-pie-layout">
+          <PieChart
+            size={250}
+            innerRadius={74}
+            onSliceClick={(slice) => focusMetric(slice.label === 'Alarming' ? 'alarming' : slice.label === 'Overdue' ? 'overdue' : '')}
+            data={[
+              { label: 'Alarming', value: summary?.alertCounts?.ALARMING ?? 0, color: '#b91c1c' },
+              { label: 'Overdue', value: summary?.alertCounts?.OVERDUE ?? 0, color: '#92400e' },
+              { label: 'Healthy', value: summary?.alertCounts?.NONE ?? 0, color: '#22c55e' }
+            ]}
+          />
+        </div>
+      </div>
+
+      {/* Violation Trend Chart */}
+      <div className="cc-content-card cc-animate-in" style={{ animationDelay: '0.25s' }} id="violation-trend">
+        <div className="cc-card-header">
+          <div>
+            <h3 className="cc-card-title">Violation trend</h3>
+            <p className="cc-card-subtitle">Alarms raised per day. Select a date range to focus the chart.</p>
+          </div>
+          <div className="cc-card-controls">
+            <label className="cc-date-label">From
+              <input type="date" className="cc-date-input" value={trendStart || ''} onChange={e => setTrendStart(e.target.value)} />
+            </label>
+            <label className="cc-date-label">To
+              <input type="date" className="cc-date-input" value={trendEnd || ''} onChange={e => setTrendEnd(e.target.value)} />
+            </label>
+            <button className="cc-btn-accent cc-magnetic" onClick={() => fetchTrendRange(trendStart, trendEnd)} style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+              Apply
+            </button>
+            <button className="cc-btn-ghost cc-magnetic" onClick={() => { const d = new Date(); const s = new Date(d.getTime() - 29 * 24 * 60 * 60 * 1000); setTrendStart(s.toISOString().slice(0,10)); setTrendEnd(d.toISOString().slice(0,10)); fetchTrendRange(s.toISOString().slice(0,10), d.toISOString().slice(0,10)); }} style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
+              Last 30d
+            </button>
+          </div>
+        </div>
+        <div className="cc-trend-chart">
           {trendData.length === 0 ? (
-            <div className="empty-state">No trend data available yet.</div>
+            <div className="cc-empty-state">No trend data available yet.</div>
           ) : (
             <TrendChart data={trendData} onBarClick={(date) => { setTrendStart(date); setTrendEnd(date); fetchTrendRange(date, date) }} />
           )}
         </div>
       </div>
 
-      <div className="content-card">
-        <div className="card-header">
-          <div>
-            <h3>Violation distribution</h3>
-            <p className="card-copy">Current proportion of tag alert statuses.</p>
-          </div>
-        </div>
-        <div style={{ padding: 16 }}>
-          <PieChart onSliceClick={(slice) => focusMetric(slice.label === 'Alarming' ? 'alarming' : slice.label === 'Overdue' ? 'overdue' : '')} data={[
-            { label: 'Alarming', value: summary?.alertCounts?.ALARMING ?? 0, color: '#ef4444' },
-            { label: 'Overdue', value: summary?.alertCounts?.OVERDUE ?? 0, color: '#f97316' },
-            { label: 'Healthy', value: summary?.alertCounts?.NONE ?? 0, color: '#10b981' }
-          ]} />
-        </div>
-      </div>
-
+      {/* Alert Banner */}
       {activeAlarms > 0 && (
-        <div className="alert-banner">
-          <div className="alert-banner__icon">🚨</div>
+        <div className="cc-alert-banner cc-animate-in">
+          <div className="cc-alert-banner__icon">🚨</div>
           <div>
             <strong>{activeAlarms} tag{activeAlarms === 1 ? '' : 's'} currently alarming</strong>
-            <p>Alarm audio will play automatically while the alert remains active.</p>
+            <p style={{ margin: '0.25rem 0 0', fontSize: '0.88rem' }}>Alarm audio will play automatically while the alert remains active.</p>
           </div>
         </div>
       )}
 
-      <div className="stats-grid">
-        <div className="stat-card accent-danger">
-          <div className="stat-title">Active alarms</div>
-          <div className="stat-value">{activeAlarms}</div>
+      {/* Secondary Stats Grid */}
+      <div className="cc-stats-grid cc-animate-in" style={{ animationDelay: '0.3s' }}>
+        <div className="cc-stat-card cc-tilt">
+          <div className="cc-stat-card__header">
+            <div>
+              <div className="cc-stat-card__label">Active alarms</div>
+              <div className="cc-stat-card__value">{activeAlarms}</div>
+            </div>
+            <div className="cc-stat-card__icon">🚨</div>
+          </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-title">Overdue items</div>
-          <div className="stat-value">{overdue}</div>
+
+        <div className="cc-stat-card cc-tilt">
+          <div className="cc-stat-card__header">
+            <div>
+              <div className="cc-stat-card__label">Overdue items</div>
+              <div className="cc-stat-card__value">{overdue}</div>
+            </div>
+            <div className="cc-stat-card__icon">⏱</div>
+          </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-title">Outside lab</div>
-          <div className="stat-value">{outside}</div>
+
+        <div className="cc-stat-card cc-tilt">
+          <div className="cc-stat-card__header">
+            <div>
+              <div className="cc-stat-card__label">Outside lab</div>
+              <div className="cc-stat-card__value">{outside}</div>
+            </div>
+            <div className="cc-stat-card__icon">📍</div>
+          </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-title">Disabled tags</div>
-          <div className="stat-value">{disabled}</div>
+
+        <div className="cc-stat-card cc-tilt">
+          <div className="cc-stat-card__header">
+            <div>
+              <div className="cc-stat-card__label">Disabled tags</div>
+              <div className="cc-stat-card__value">{disabled}</div>
+            </div>
+            <div className="cc-stat-card__icon">🔒</div>
+          </div>
         </div>
       </div>
 
-      <div className="content-card" id="tag-list">
-        <div className="card-header">
+      {/* Tags Table */}
+      <div className="cc-content-card cc-animate-in" style={{ animationDelay: '0.35s' }} id="tag-list">
+        <div className="cc-card-header">
           <div>
-            <h3>All tags</h3>
-            <p className="card-copy">{tagFilter ? `Filtered view: ${tagFilter}.` : 'A live view of every tag in the lab system.'}</p>
+            <h3 className="cc-card-title">All tags</h3>
+            <p className="cc-card-subtitle">{tagFilter ? `Filtered view: ${tagFilter}.` : 'A live view of every tag in the lab system.'}</p>
           </div>
-          <div className="chip-row">
-            <button className="chip" onClick={() => setTagFilter('')}>{tags.length} total</button>
-            <span className="chip chip-warning">{activeAlarms} alarming</span>
+          <div className="cc-card-chips">
+            <button className="cc-pill cc-pill--neutral" onClick={() => setTagFilter('')}>{tags.length} total</button>
+            <span className="cc-pill cc-pill--warning">{activeAlarms} alarming</span>
           </div>
         </div>
 
         {loadError ? (
-          <div className="empty-state" role="alert">{loadError}</div>
+          <div className="cc-empty-state" role="alert">{loadError}</div>
         ) : loading ? (
-          <div className="loading-state">Loading tags…</div>
+          <div className="cc-loading-state">Loading tags…</div>
         ) : visibleTags.length === 0 ? (
-          <div className="empty-state">No tags have been created yet.</div>
+          <div className="cc-empty-state">No tags have been created yet.</div>
         ) : (
-          <div className="table-wrapper">
-            <table className="data-table">
+          <div className="cc-table-wrapper">
+            <table className="cc-data-table">
               <thead>
                 <tr>
                   <th>Tag ID</th>
@@ -371,18 +452,18 @@ export default function Dashboard({ siteId, soundEnabled, onEnableSound }) {
               </thead>
               <tbody>
                 {visibleTags.map(tag => (
-                  <tr key={tag._id} className={`tag-row ${tag.alertStatus === 'ALARMING' ? 'tag-row--alarming' : tag.alertStatus === 'OVERDUE' ? 'tag-row--overdue' : ''}`}>
+                  <tr key={tag._id} className={`cc-tag-row ${tag.alertStatus === 'ALARMING' ? 'cc-tag-row--alarming' : tag.alertStatus === 'OVERDUE' ? 'cc-tag-row--overdue' : ''}`}>
                     <td>
-                      <div className="table-main"><Link to={`/tags/${tag._id}/history`}>{tag.tagId}</Link></div>
-                      {tag.alertStatus === 'ALARMING' && <div className="table-meta">🚨 Immediate attention required</div>}
-                      {tag.alertStatus === 'OVERDUE' && <div className="table-meta">⏱ Return or resolve overdue item</div>}
+                      <div className="cc-table-main"><Link to={`/tags/${tag._id}/history`}>{tag.tagId}</Link></div>
+                      {tag.alertStatus === 'ALARMING' && <div className="cc-table-meta">🚨 Immediate attention required</div>}
+                      {tag.alertStatus === 'OVERDUE' && <div className="cc-table-meta">⏱ Return or resolve overdue item</div>}
                     </td>
                     <td>{tag.equipment?.name || 'N/A'}</td>
                     <td>{tag.status}</td>
                     <td>{tag.assignedZone?.name || 'Unassigned'}</td>
                     <td>{tag.currentZone?.name || 'Outside all zones'}</td>
                     <td>
-                      <span className={`status-pill ${tag.alertStatus === 'ALARMING' ? 'danger' : tag.alertStatus === 'OVERDUE' ? 'warning' : 'neutral'}`}>
+                      <span className={`cc-status-pill ${tag.alertStatus === 'ALARMING' ? 'cc-status-pill--danger' : tag.alertStatus === 'OVERDUE' ? 'cc-status-pill--warning' : 'cc-status-pill--neutral'}`}>
                         {tag.alertStatus === 'ALARMING' ? '🚨 ALARMING' : tag.alertStatus === 'OVERDUE' ? '⏱ OVERDUE' : 'NO ALERT'}
                       </span>
                     </td>
@@ -393,6 +474,351 @@ export default function Dashboard({ siteId, soundEnabled, onEnableSound }) {
           </div>
         )}
       </div>
+
+      <style>{`
+        /* ─── Dashboard Layout ───────────────────────────────────── */
+        .cc-dashboard {
+          display: flex;
+          flex-direction: column;
+          gap: 1.25rem;
+        }
+
+        /* ─── Page Header ────────────────────────────────────────── */
+        .cc-page-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          padding: 1.25rem 1.5rem;
+          background: var(--cc-glass-bg);
+          backdrop-filter: blur(var(--cc-glass-blur));
+          -webkit-backdrop-filter: blur(var(--cc-glass-blur));
+          border: 1px solid var(--cc-glass-border);
+          border-radius: var(--cc-radius-lg);
+        }
+
+        .cc-eyebrow {
+          margin: 0 0 0.35rem;
+          text-transform: uppercase;
+          letter-spacing: 0.2em;
+          font-size: 0.76rem;
+          color: var(--cc-accent);
+          font-weight: 700;
+        }
+
+        .cc-page-title {
+          margin: 0;
+          font-size: 1.75rem;
+          font-weight: 700;
+          color: var(--cc-text-primary);
+        }
+
+        .cc-page-subtitle {
+          margin: 0.3rem 0 0;
+          color: var(--cc-text-secondary);
+          font-size: 0.92rem;
+        }
+
+        .cc-page-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+
+        /* ─── Banners ────────────────────────────────────────────── */
+        .cc-banner {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 1rem;
+          padding: 0.85rem 1.25rem;
+          border-radius: var(--cc-radius-md);
+          font-size: 0.92rem;
+          animation: cc-slideUp 300ms ease;
+        }
+
+        .cc-banner--info {
+          background: rgba(14, 165, 233, 0.08);
+          color: #1e40af;
+          border: 1px solid rgba(14, 165, 233, 0.2);
+        }
+
+        .cc-banner--success {
+          background: rgba(34, 197, 94, 0.08);
+          color: #166534;
+          border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+
+        /* ─── Status Pills ───────────────────────────────────────── */
+        .cc-status-pills {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.6rem;
+        }
+
+        /* ─── Stats Grid ─────────────────────────────────────────── */
+        .cc-stats-grid {
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          gap: 1rem;
+        }
+
+        .cc-stat-card__header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+        }
+
+        .cc-stat-card__icon {
+          font-size: 1.5rem;
+          opacity: 0.8;
+        }
+
+        .cc-stat-card__trend {
+          font-size: 0.78rem;
+          font-weight: 600;
+          margin-top: 0.35rem;
+        }
+
+        .cc-stat-card__trend--up {
+          color: #22c55e;
+        }
+
+        .cc-stat-card__trend--down {
+          color: #f59e0b;
+        }
+
+        /* ─── Content Card ───────────────────────────────────────── */
+        .cc-content-card {
+          background: var(--cc-glass-bg);
+          backdrop-filter: blur(var(--cc-glass-blur));
+          -webkit-backdrop-filter: blur(var(--cc-glass-blur));
+          border: 1px solid var(--cc-glass-border);
+          border-radius: var(--cc-radius-lg);
+          padding: 1.25rem 1.5rem;
+        }
+
+        .cc-card-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1rem;
+          gap: 1rem;
+        }
+
+        .cc-card-title {
+          margin: 0;
+          font-size: 1.1rem;
+          font-weight: 600;
+          color: var(--cc-text-primary);
+        }
+
+        .cc-card-subtitle {
+          margin: 0.25rem 0 0;
+          color: var(--cc-text-secondary);
+          font-size: 0.88rem;
+        }
+
+        .cc-card-controls {
+          display: flex;
+          gap: 0.5rem;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+
+        .cc-date-label {
+          font-size: 0.82rem;
+          color: var(--cc-text-secondary);
+        }
+
+        .cc-date-input {
+          margin-left: 0.4rem;
+          padding: 0.4rem 0.5rem;
+          border-radius: var(--cc-radius-sm);
+          border: 1px solid var(--cc-glass-border);
+          background: #ffffff;
+          color: var(--cc-text-primary);
+          font-size: 0.85rem;
+          transition: border-color 200ms ease, box-shadow 200ms ease;
+        }
+
+        .cc-date-input:focus {
+          outline: none;
+          border-color: var(--cc-accent);
+          box-shadow: 0 0 0 3px rgba(47, 103, 246, 0.12);
+        }
+
+        .cc-card-chips {
+          display: flex;
+          gap: 0.5rem;
+        }
+
+        /* ─── Pie layout — big, centered donut ─────────────────── */
+        .cc-pie-layout {
+          display: flex;
+          justify-content: center;
+          padding: 0.5rem 0 0.25rem;
+        }
+
+        /* ─── Alert Banner ───────────────────────────────────────── */
+        .cc-alert-banner {
+          display: flex;
+          gap: 0.8rem;
+          align-items: center;
+          padding: 1rem 1.25rem;
+          border-radius: var(--cc-radius-md);
+          background: rgba(239, 68, 68, 0.06);
+          border: 1px solid rgba(239, 68, 68, 0.2);
+          color: #b91c1c;
+        }
+
+        .cc-alert-banner__icon {
+          font-size: 1.25rem;
+        }
+
+        .cc-alert-banner strong {
+          color: #b91c1c;
+        }
+
+        /* ─── Table ──────────────────────────────────────────────── */
+        .cc-table-wrapper {
+          overflow-x: auto;
+          margin: 0 -0.5rem;
+          padding: 0 0.5rem;
+        }
+
+        .cc-data-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+
+        .cc-data-table th,
+        .cc-data-table td {
+          padding: 0.85rem 0.75rem;
+          text-align: left;
+          border-bottom: 1px solid var(--cc-glass-border);
+          transition: background 150ms ease;
+        }
+
+        .cc-data-table th {
+          color: var(--cc-text-muted);
+          font-size: 0.76rem;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          font-weight: 700;
+        }
+
+        .cc-data-table tbody tr:hover {
+          background: rgba(0, 0, 0, 0.03);
+        }
+
+        .cc-table-main {
+          font-weight: 600;
+        }
+
+        .cc-table-main a {
+          color: var(--cc-accent);
+          text-decoration: none;
+          transition: opacity var(--cc-transition-fast);
+        }
+
+        .cc-table-main a:hover {
+          opacity: 0.7;
+          text-decoration: underline;
+        }
+
+        .cc-table-meta {
+          font-size: 0.78rem;
+          color: var(--cc-text-muted);
+          margin-top: 0.25rem;
+        }
+
+        .cc-tag-row--alarming {
+          background: rgba(239, 68, 68, 0.05);
+        }
+
+        .cc-tag-row--overdue {
+          background: rgba(245, 158, 11, 0.05);
+        }
+
+        /* ─── Status Pill Variants ───────────────────────────────── */
+        .cc-status-pill {
+          display: inline-flex;
+          align-items: center;
+          border-radius: var(--cc-radius-full);
+          padding: 0.3rem 0.6rem;
+          font-size: 0.72rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.04em;
+        }
+
+        .cc-status-pill--danger {
+          background: rgba(239, 68, 68, 0.10);
+          color: #b91c1c;
+        }
+
+        .cc-status-pill--warning {
+          background: rgba(245, 158, 11, 0.10);
+          color: #92400e;
+        }
+
+        .cc-status-pill--neutral {
+          background: rgba(0, 0, 0, 0.06);
+          color: var(--cc-text-secondary);
+        }
+
+        /* ─── Empty / Loading States ─────────────────────────────── */
+        .cc-empty-state,
+        .cc-loading-state {
+          padding: 2rem;
+          border-radius: var(--cc-radius-md);
+          background: rgba(0,0,0,0.03);
+          color: var(--cc-text-secondary);
+          text-align: center;
+          font-size: 0.92rem;
+        }
+
+        .cc-loading-state {
+          position: relative;
+        }
+
+        .cc-loading-state::before {
+          content: '';
+          display: inline-block;
+          width: 20px;
+          height: 20px;
+          border: 2.5px solid rgba(0,0,0,0.1);
+          border-top-color: #2f67f6;
+          border-radius: 50%;
+          animation: spin 700ms linear infinite;
+          margin-bottom: 0.6rem;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ─── Responsive ─────────────────────────────────────────── */
+        @media (max-width: 960px) {
+          .cc-stats-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+
+        @media (max-width: 640px) {
+          .cc-stats-grid {
+            grid-template-columns: 1fr;
+          }
+
+          .cc-page-header {
+            flex-direction: column;
+            gap: 1rem;
+          }
+
+          .cc-card-controls {
+            flex-direction: column;
+            align-items: stretch;
+          }
+        }
+      `}</style>
     </div>
   )
 }

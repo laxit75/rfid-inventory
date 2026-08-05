@@ -114,8 +114,16 @@ export default function Simulator() {
           <label className="field-group">
             <span>Reader</span>
             <select value={selectedReader} onChange={e => setSelectedReader(e.target.value)}>
-              <option value="Shutter-1">Shutter-1 (guards Zone A - Test Bay)</option>
-              <option value="Shutter-2">Shutter-2 (guards Zone B - Paint Shop)</option>
+              <option value="Shutter-1">Shutter-1 — Zone A exit (Test Bay north gate)</option>
+              <option value="Shutter-1-Entry">Shutter-1-Entry — Zone A entry (Test Bay north gate)</option>
+              <option value="Shutter-3">Shutter-3 — Zone A exit (Test Bay east gate)</option>
+              <option value="Shutter-3-Entry">Shutter-3-Entry — Zone A entry (Test Bay east gate)</option>
+              <option value="Shutter-2">Shutter-2 — Zone B exit (Paint Shop south gate)</option>
+              <option value="Shutter-2-Entry">Shutter-2-Entry — Zone B entry (Paint Shop south gate)</option>
+              <option value="Reader-C1">Reader-C1 — Zone C exit (Assembly line)</option>
+              <option value="Reader-C2">Reader-C2 — Zone C entry (Assembly line)</option>
+              <option value="Tool-Crib-Exit">Tool-Crib-Exit — Zone D exit (Tool crib)</option>
+              <option value="Tool-Crib-Entry">Tool-Crib-Entry — Zone D entry (Tool crib)</option>
             </select>
           </label>
           <div className="button-row">
@@ -136,12 +144,24 @@ export default function Simulator() {
 
         <div className="zone-map">
           <div className="zone-card active">
-            <strong>Shutter-1</strong>
-            <span>North dock gate</span>
+            <strong>Zone A — Test Bay</strong>
+            <span>Shutter-1 (N gate) · Shutter-3 (E gate)</span>
+            <span style={{fontSize:'0.75rem',color:'#64748b'}}>2 speakers, 4 readers</span>
           </div>
           <div className="zone-card">
-            <strong>Shutter-2</strong>
-            <span>South inspection lane</span>
+            <strong>Zone B — Paint Shop</strong>
+            <span>Shutter-2 (S gate)</span>
+            <span style={{fontSize:'0.75rem',color:'#64748b'}}>1 speaker, 2 readers</span>
+          </div>
+          <div className="zone-card">
+            <strong>Zone C — Assembly Line</strong>
+            <span>Reader-C1 (exit) · Reader-C2 (entry)</span>
+            <span style={{fontSize:'0.75rem',color:'#64748b'}}>1 speaker, 2 readers</span>
+          </div>
+          <div className="zone-card">
+            <strong>Zone D — Tool Crib</strong>
+            <span>Tool-Crib-Exit · Tool-Crib-Entry</span>
+            <span style={{fontSize:'0.75rem',color:'#64748b'}}>1 speaker, 2 readers</span>
           </div>
         </div>
 

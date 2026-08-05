@@ -5,6 +5,9 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { startScheduler, stopScheduler } = require('./services/scheduler');
+const { startAlarmScheduler, stopAlarmScheduler } = require('./services/alarmScheduler');
+const { runHourlyDigest } = require('./jobs/hourlyAlertDigest');
+const { runDailyDigest } = require('./jobs/dailyAlertDigest');
 const { startEmailWorker, stopEmailWorker } = require('./workers/emailWorker');
 const { startSpeakerWorker, stopSpeakerWorker } = require('./workers/speakerWorker');
 const { startChangeStream, stopChangeStream } = require('./services/changeStream');
@@ -104,6 +107,7 @@ app.use('/api/device-groups', adminLimiter, require('./routes/deviceGroups'));
 app.use('/api/alert-target-groups', adminLimiter, require('./routes/alertTargetGroups'));
 app.use('/api/alert-flows', adminLimiter, require('./routes/alertFlows'));
 app.use('/api/tag-assignments', adminLimiter, require('./routes/tagAssignments'));
+app.use('/api/tag-alert-states', require('./routes/tagAlertStates'));
 app.use(errorHandler);
 
 let server;
@@ -126,16 +130,64 @@ function connectWithRetry() {
           onAcquire: async () => {
             try { await startChangeStream(); } catch (e) {}
             try { startScheduler(); } catch (e) {}
+            try { startAlarmScheduler(); } catch (e) { logger.warn('Alarm scheduler unavailable', { error: e.message }); }
             try { await startEmailWorker(); } catch (e) {}
             try { await startSpeakerWorker(); } catch (e) {}
             try { startMarktraceServer(); } catch (e) { logger.warn('Marktrace TCP server unavailable', { error: e.message }); }
+            // Schedule hourly digest — fires at the start of each hour
+            _digestTimers = _digestTimers || [];
+            try {
+              const now = new Date();
+              const msUntilNextHour = (60 - now.getMinutes()) * 60 * 1000 - now.getSeconds() * 1000 - now.getMilliseconds();
+              const hourlyTimeout = setTimeout(() => {
+                runHourlyDigest().catch((err) => logger.error('Hourly digest failed', { error: err.message }));
+                const hourlyInterval = setInterval(() => {
+                  runHourlyDigest().catch((err) => logger.error('Hourly digest failed', { error: err.message }));
+                }, 60 * 60 * 1000);
+                _digestTimers.push(hourlyInterval);
+              }, msUntilNextHour);
+              _digestTimers.push(hourlyTimeout);
+              logger.info('Hourly digest scheduled', { firstRunInMs: msUntilNextHour });
+            } catch (e) {
+              logger.warn('Failed to schedule hourly digest', { error: e.message });
+            }
+            // Schedule daily digest — fires at 8 PM every day
+            try {
+              const now = new Date();
+              const targetHour = 20; // 8 PM
+              const msUntilNextDaily = (
+                ((targetHour - now.getHours() + 24) % 24) * 60 * 60 * 1000
+                - now.getMinutes() * 60 * 1000
+                - now.getSeconds() * 1000
+                - now.getMilliseconds()
+              );
+              const dailyTimeout = setTimeout(() => {
+                runDailyDigest().catch((err) => logger.error('Daily digest failed', { error: err.message }));
+                const dailyInterval = setInterval(() => {
+                  runDailyDigest().catch((err) => logger.error('Daily digest failed', { error: err.message }));
+                }, 24 * 60 * 60 * 1000);
+                _digestTimers.push(dailyInterval);
+              }, msUntilNextDaily);
+              _digestTimers.push(dailyTimeout);
+              logger.info('Daily digest scheduled', { firstRunInMs: msUntilNextDaily });
+            } catch (e) {
+              logger.warn('Failed to schedule daily digest', { error: e.message });
+            }
           },
           onRelease: async () => {
             try { stopChangeStream(); } catch (e) {}
             try { stopScheduler(); } catch (e) {}
+            try { stopAlarmScheduler(); } catch (e) {}
             try { await stopEmailWorker(); } catch (e) {}
             try { await stopSpeakerWorker(); } catch (e) {}
             try { stopMarktraceServer(); } catch (e) {}
+            // Clear digest timers
+            _digestTimers = _digestTimers || [];
+            for (const t of _digestTimers) {
+              try { clearTimeout(t); } catch (e) {}
+              try { clearInterval(t); } catch (e) {}
+            }
+            _digestTimers = [];
           }
         });
       const PORT = process.env.PORT || 5000;
@@ -226,6 +278,8 @@ process.on('unhandledRejection', (reason) => {
   logger.error('Unhandled rejection', { reason });
   process.exit(1);
 });
+
+let _digestTimers = [];
 
 require('./models/Equipment');
 require('./models/Tag');

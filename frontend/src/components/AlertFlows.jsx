@@ -153,7 +153,7 @@ export default function AlertFlows() {
         <div>
           <p className="eyebrow">Automation</p>
           <h2>Alert flows</h2>
-          <p className="page-subtitle">Define rules that connect equipment movements to notifications and alarms. (Inspired by MSIL Alert Flow system)</p>
+          <p className="page-subtitle">Define rules that connect equipment movements to notifications and alarms.</p>
         </div>
         <button className="button" onClick={() => { setShowForm(!showForm); setEditingId(null); setForm(emptyForm); setSelectedFlow(null) }}>
           {showForm ? 'Cancel' : 'New flow'}
@@ -193,15 +193,15 @@ export default function AlertFlows() {
             <div style={{ margin: '0.75rem 0' }}>
               <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#334155' }}>Trigger conditions</span>
               <div className="chip-row" style={{ marginTop: '0.4rem' }}>
-                <label className="chip" style={{ cursor: 'pointer', background: form.triggerOnExit ? '#2563eb' : '#f1f5f9', color: form.triggerOnExit ? 'white' : '#334155' }}>
+                <label className="chip" style={{ cursor: 'pointer', background: form.triggerOnExit ? '#2f67f6' : '#f1f5f9', color: form.triggerOnExit ? 'white' : '#334155' }}>
                   <input type="checkbox" checked={form.triggerOnExit} onChange={e => setForm({ ...form, triggerOnExit: e.target.checked })} style={{ display: 'none' }} />
                   Exit movement
                 </label>
-                <label className="chip" style={{ cursor: 'pointer', background: form.triggerOnOverdue ? '#2563eb' : '#f1f5f9', color: form.triggerOnOverdue ? 'white' : '#334155' }}>
+                <label className="chip" style={{ cursor: 'pointer', background: form.triggerOnOverdue ? '#2f67f6' : '#f1f5f9', color: form.triggerOnOverdue ? 'white' : '#334155' }}>
                   <input type="checkbox" checked={form.triggerOnOverdue} onChange={e => setForm({ ...form, triggerOnOverdue: e.target.checked })} style={{ display: 'none' }} />
                   Overdue return
                 </label>
-                <label className="chip" style={{ cursor: 'pointer', background: form.isResolutionRequired ? '#2563eb' : '#f1f5f9', color: form.isResolutionRequired ? 'white' : '#334155' }}>
+                <label className="chip" style={{ cursor: 'pointer', background: form.isResolutionRequired ? '#2f67f6' : '#f1f5f9', color: form.isResolutionRequired ? 'white' : '#334155' }}>
                   <input type="checkbox" checked={form.isResolutionRequired} onChange={e => setForm({ ...form, isResolutionRequired: e.target.checked })} style={{ display: 'none' }} />
                   Manual resolution required
                 </label>
